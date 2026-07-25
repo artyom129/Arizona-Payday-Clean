@@ -1,0 +1,16 @@
+# Local configuration and private Telegram credentials
+**/ArizonaPaydayClean.ini
+
+# Temporary Telegram API responses
+**/ArizonaPaydayTelegramResponse_*.json
+
+# MoonLoader and game logs
+moonloader.log
+**/moonloader.log
+
+# Common temporary files
+*.tmp
+*.bak
+*.log
+Thumbs.db
+.DS_Store
