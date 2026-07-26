@@ -17,8 +17,8 @@ local inicfg = require 'inicfg'
 local ffi = require 'ffi'
 local dlstatus = require('moonloader').download_status
 
--- Telegram отправляется через встроенный асинхронный загрузчик MoonLoader.
--- Никаких curl.exe, PowerShell, BAT-файлов и CreateProcessA.
+-- Telegram Г®ГІГЇГ°Г ГўГ«ГїГҐГІГ±Гї Г·ГҐГ°ГҐГ§ ГўГ±ГІГ°Г®ГҐГ­Г­Г»Г© Г Г±ГЁГ­ГµГ°Г®Г­Г­Г»Г© Г§Г ГЈГ°ГіГ§Г·ГЁГЄ MoonLoader.
+-- ГЌГЁГЄГ ГЄГЁГµ curl.exe, PowerShell, BAT-ГґГ Г©Г«Г®Гў ГЁ CreateProcessA.
 
 local CONFIG = 'ArizonaPaydayClean.ini'
 
@@ -35,7 +35,7 @@ local ini = inicfg.load({
         total_salary = 0,
         total_deposit = 0,
         total_az = 0,
-        last_payday = 'Нет данных'
+        last_payday = 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ'
     },
     rank = {
         number = 1,
@@ -45,7 +45,7 @@ local ini = inicfg.load({
         tracking = false,
         repaid = 0,
         caught_paydays = 0,
-        started = 'Нет данных',
+        started = 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ',
         completed = false
     },
     ui = {
@@ -75,15 +75,15 @@ local window = new.bool(false)
 local miniEnabled = new.bool(asBool(ini.ui.mini))
 local useDeposit = new.bool(asBool(ini.rank.use_deposit))
 
--- Эти значения не передаются напрямую в ImGui, поэтому храним их как Lua-числа.
--- Так цены выше 2 147 483 647 не переполняют 32-битный imgui.new.int.
+-- ГќГІГЁ Г§Г­Г Г·ГҐГ­ГЁГї Г­ГҐ ГЇГҐГ°ГҐГ¤Г ГѕГІГ±Гї Г­Г ГЇГ°ГїГ¬ГіГѕ Гў ImGui, ГЇГ®ГЅГІГ®Г¬Гі ГµГ°Г Г­ГЁГ¬ ГЁГµ ГЄГ ГЄ Lua-Г·ГЁГ±Г«Г .
+-- Г’Г ГЄ Г¶ГҐГ­Г» ГўГ»ГёГҐ 2 147 483 647 Г­ГҐ ГЇГҐГ°ГҐГЇГ®Г«Г­ГїГѕГІ 32-ГЎГЁГІГ­Г»Г© imgui.new.int.
 local rankNumber = { [0] = tonumber(ini.rank.number) or 1 }
 local rankCost = { [0] = tonumber(ini.rank.cost) or 0 }
 local rankSalary = { [0] = tonumber(ini.rank.salary_x1) or 0 }
 local forecastPaydays = new.int(10)
 
--- Текстовые поля используются вместо InputInt:
--- InputInt в mimgui реагирует на перетаскивание мышью и из-за этого дергает курсор.
+-- Г’ГҐГЄГ±ГІГ®ГўГ»ГҐ ГЇГ®Г«Гї ГЁГ±ГЇГ®Г«ГјГ§ГіГѕГІГ±Гї ГўГ¬ГҐГ±ГІГ® InputInt:
+-- InputInt Гў mimgui Г°ГҐГ ГЈГЁГ°ГіГҐГІ Г­Г  ГЇГҐГ°ГҐГІГ Г±ГЄГЁГўГ Г­ГЁГҐ Г¬Г»ГёГјГѕ ГЁ ГЁГ§-Г§Г  ГЅГІГ®ГЈГ® Г¤ГҐГ°ГЈГ ГҐГІ ГЄГіГ°Г±Г®Г°.
 local rankNumberText = new.char[16](tostring(rankNumber[0]))
 local rankCostText = new.char[32](tostring(rankCost[0]))
 local rankSalaryText = new.char[32](tostring(rankSalary[0]))
@@ -91,7 +91,7 @@ local telegramTokenText = new.char[128](tostring(ini.telegram.token or ''))
 local telegramChatIdText = new.char[32](tostring(ini.telegram.chat_id or ''))
 
 local activeTab = 1
-local statusText = 'Ожидаю ближайший PayDay'
+local statusText = 'ГЋГ¦ГЁГ¤Г Гѕ ГЎГ«ГЁГ¦Г Г©ГёГЁГ© PayDay'
 local lastPaydayCatch = 0
 local paydaySequence = 0
 local paydayPending = false
@@ -207,14 +207,14 @@ local function timeFromPaydays(count)
     minutes = minutes - hours * 60
 
     if days > 0 then
-        return string.format('%d д. %d ч. %d мин.', days, hours, minutes)
+        return string.format('%d Г¤. %d Г·. %d Г¬ГЁГ­.', days, hours, minutes)
     end
 
     if hours > 0 then
-        return string.format('%d ч. %d мин.', hours, minutes)
+        return string.format('%d Г·. %d Г¬ГЁГ­.', hours, minutes)
     end
 
-    return string.format('%d мин.', minutes)
+    return string.format('%d Г¬ГЁГ­.', minutes)
 end
 
 local function stringFromBuffer(buffer)
@@ -370,16 +370,16 @@ local function telegramProgressStatus(progress)
     progress = clampNumber(progress, 0, 1)
 
     if progress >= 1 then
-        return 'Цель достигнута'
+        return 'Г–ГҐГ«Гј Г¤Г®Г±ГІГЁГЈГ­ГіГІГ '
     elseif progress >= 0.75 then
-        return 'Финишная прямая'
+        return 'Г”ГЁГ­ГЁГёГ­Г Гї ГЇГ°ГїГ¬Г Гї'
     elseif progress >= 0.50 then
-        return 'Больше половины'
+        return 'ГЃГ®Г«ГјГёГҐ ГЇГ®Г«Г®ГўГЁГ­Г»'
     elseif progress >= 0.25 then
-        return 'Хороший темп'
+        return 'Г•Г®Г°Г®ГёГЁГ© ГІГҐГ¬ГЇ'
     end
 
-    return 'Начало пути'
+    return 'ГЌГ Г·Г Г«Г® ГЇГіГІГЁ'
 end
 
 local function telegramMessage()
@@ -400,38 +400,38 @@ local function telegramMessage()
     local lines = {
         '<DIAMOND> <b>ARIZONA PAYDAY</b>',
         '<LINE>',
-        '<DONE> <b>Начисление успешно</b>',
+        '<DONE> <b>ГЌГ Г·ГЁГ±Г«ГҐГ­ГЁГҐ ГіГ±ГЇГҐГёГ­Г®</b>',
         '',
-        '<MONEY> <b>ДОХОД</b>',
-        '<MID> Зарплата: <b>' .. money(salary) .. '</b>',
-        '<MID> Депозит: <b>' .. money(depositPlus) .. '</b>',
-        '<MID> Бонус: <b>' .. multiplierText(st.multiplier) .. '</b>',
-        '<END> Итого: <b>' .. money(totalPayday) .. '</b>',
+        '<MONEY> <b>Г„ГЋГ•ГЋГ„</b>',
+        '<MID> Г‡Г Г°ГЇГ«Г ГІГ : <b>' .. money(salary) .. '</b>',
+        '<MID> Г„ГҐГЇГ®Г§ГЁГІ: <b>' .. money(depositPlus) .. '</b>',
+        '<MID> ГЃГ®Г­ГіГ±: <b>' .. multiplierText(st.multiplier) .. '</b>',
+        '<END> Г€ГІГ®ГЈГ®: <b>' .. money(totalPayday) .. '</b>',
         '',
-        '<BANK> <b>БАЛАНС</b>',
-        '<MID> Банк: <b>' .. money(ini.stats.bank) .. '</b>',
-        '<MID> Депозит: <b>' .. money(ini.stats.deposit) .. '</b>',
+        '<BANK> <b>ГЃГЂГ‹ГЂГЌГ‘</b>',
+        '<MID> ГЃГ Г­ГЄ: <b>' .. money(ini.stats.bank) .. '</b>',
+        '<MID> Г„ГҐГЇГ®Г§ГЁГІ: <b>' .. money(ini.stats.deposit) .. '</b>',
         '<END> AZ Coins: <b>' .. azText .. '</b>',
         '',
-        '<RANK> <b>РАНГ №' .. tostring(rankNumberValue) .. '</b>',
+        '<RANK> <b>ГђГЂГЌГѓ В№' .. tostring(rankNumberValue) .. '</b>',
         '<b>' .. string.format('%.1f%%', progressPercent)
             .. '  <DOT>  ' .. telegramProgressStatus(st.progress) .. '</b>',
         telegramProgressBar(st.progress, 14),
-        '<MID> Возвращено: <b>' .. money(st.repaid) .. '</b>',
-        '<MID> Осталось: <b>' .. money(st.remaining) .. '</b>',
-        '<MID> Прогноз x1: <b>' .. tostring(st.remainingX1) .. ' Payday</b>',
-        '<END> По текущему доходу: <b>' .. tostring(st.remainingReal) .. ' Payday</b>',
-        '<HOUR> Примерно: <b>' .. timeFromPaydays(st.remainingReal) .. '</b>',
+        '<MID> Г‚Г®Г§ГўГ°Г Г№ГҐГ­Г®: <b>' .. money(st.repaid) .. '</b>',
+        '<MID> ГЋГ±ГІГ Г«Г®Г±Гј: <b>' .. money(st.remaining) .. '</b>',
+        '<MID> ГЏГ°Г®ГЈГ­Г®Г§ x1: <b>' .. tostring(st.remainingX1) .. ' Payday</b>',
+        '<END> ГЏГ® ГІГҐГЄГіГ№ГҐГ¬Гі Г¤Г®ГµГ®Г¤Гі: <b>' .. tostring(st.remainingReal) .. ' Payday</b>',
+        '<HOUR> ГЏГ°ГЁГ¬ГҐГ°Г­Г®: <b>' .. timeFromPaydays(st.remainingReal) .. '</b>',
         '',
         '<TIME> <i>' .. os.date('%d.%m.%Y  <DOT>  %H:%M:%S') .. '</i>'
     }
 
     if asBool(ini.rank.completed) then
         table.insert(lines, '')
-        table.insert(lines, '<DONE> <b>РАНГ ПОЛНОСТЬЮ ОКУПЛЕН</b>')
+        table.insert(lines, '<DONE> <b>ГђГЂГЌГѓ ГЏГЋГ‹ГЌГЋГ‘Г’ГњГћ ГЋГЉГ“ГЏГ‹Г…ГЌ</b>')
     elseif not asBool(ini.rank.tracking) then
         table.insert(lines, '')
-        table.insert(lines, '<WARN> <b>Отсчет окупаемости выключен</b>')
+        table.insert(lines, '<WARN> <b>ГЋГІГ±Г·ГҐГІ Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГЁ ГўГ»ГЄГ«ГѕГ·ГҐГ­</b>')
     end
 
     return table.concat(lines, string.char(10))
@@ -500,12 +500,12 @@ local function finishTelegramRequest(success, description)
     if success then
         telegramLog('Message sent successfully.')
         if item and item.showResult then
-            sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Сообщение отправлено.', -1)
+            sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Г‘Г®Г®ГЎГ№ГҐГ­ГЁГҐ Г®ГІГЇГ°Г ГўГ«ГҐГ­Г®.', -1)
         end
     else
         telegramLog('Send failed: ' .. tostring(description or 'unknown error'))
         if item and item.showResult then
-            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Не удалось отправить сообщение. Причина записана в moonloader.log.', -1)
+            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}ГЌГҐ ГіГ¤Г Г«Г®Г±Гј Г®ГІГЇГ°Г ГўГЁГІГј Г±Г®Г®ГЎГ№ГҐГ­ГЁГҐ. ГЏГ°ГЁГ·ГЁГ­Г  Г§Г ГЇГЁГ±Г Г­Г  Гў moonloader.log.', -1)
         end
     end
 end
@@ -514,8 +514,8 @@ local function processTelegramTransport()
     if telegramFinished then
         local result = telegramFinished
 
-        -- Поздний callback от запроса, который уже завершился по тайм-ауту,
-        -- не должен сбрасывать состояние следующей отправки.
+        -- ГЏГ®Г§Г¤Г­ГЁГ© callback Г®ГІ Г§Г ГЇГ°Г®Г±Г , ГЄГ®ГІГ®Г°Г»Г© ГіГ¦ГҐ Г§Г ГўГҐГ°ГёГЁГ«Г±Гї ГЇГ® ГІГ Г©Г¬-Г ГіГІГі,
+        -- Г­ГҐ Г¤Г®Г«Г¦ГҐГ­ Г±ГЎГ°Г Г±Г»ГўГ ГІГј Г±Г®Г±ГІГ®ГїГ­ГЁГҐ Г±Г«ГҐГ¤ГіГѕГ№ГҐГ© Г®ГІГЇГ°Г ГўГЄГЁ.
         if not telegramCurrent or result.requestId ~= telegramCurrent.requestId then
             if result.path and doesFileExist(result.path) then
                 os.remove(result.path)
@@ -626,7 +626,7 @@ local function sendTelegramMessage(message, showResult)
 
     if not telegramReady() then
         if showResult then
-            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Telegram не настроен. Используй /paytg TOKEN CHAT_ID', -1)
+            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Telegram Г­ГҐ Г­Г Г±ГІГ°Г®ГҐГ­. Г€Г±ГЇГ®Г«ГјГ§ГіГ© /paytg TOKEN CHAT_ID', -1)
         end
         return false
     end
@@ -634,7 +634,7 @@ local function sendTelegramMessage(message, showResult)
     if #telegramQueue >= 10 then
         telegramLog('Queue is full; message dropped.')
         if showResult then
-            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Очередь отправки переполнена.', -1)
+            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}ГЋГ·ГҐГ°ГҐГ¤Гј Г®ГІГЇГ°Г ГўГЄГЁ ГЇГҐГ°ГҐГЇГ®Г«Г­ГҐГ­Г .', -1)
         end
         return false
     end
@@ -668,8 +668,8 @@ local function telegramCommand(arg)
     local token, chatId = arg:match('^%s*(%S+)%s+(%-?%d+)%s*$')
 
     if not token or not chatId then
-        sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}Настройка: /paytg TOKEN CHAT_ID', -1)
-        sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}Тест: /paytgtest | Вкл: /paytgon | Выкл: /paytgoff', -1)
+        sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}ГЌГ Г±ГІГ°Г®Г©ГЄГ : /paytg TOKEN CHAT_ID', -1)
+        sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}Г’ГҐГ±ГІ: /paytgtest | Г‚ГЄГ«: /paytgon | Г‚Г»ГЄГ«: /paytgoff', -1)
         return
     end
 
@@ -677,7 +677,7 @@ local function telegramCommand(arg)
     chatId = safeTelegramValue(chatId)
 
     if not telegramCredentialsValid(token, chatId) then
-        sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Некорректный token или chat ID.', -1)
+        sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}ГЌГҐГЄГ®Г°Г°ГҐГЄГІГ­Г»Г© token ГЁГ«ГЁ chat ID.', -1)
         return
     end
 
@@ -686,11 +686,11 @@ local function telegramCommand(arg)
     ini.telegram.enabled = true
     inicfg.save(ini, CONFIG)
 
-    sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Telegram сохранен и включен. Проверка: /paytgtest', -1)
+    sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Telegram Г±Г®ГµГ°Г Г­ГҐГ­ ГЁ ГўГЄГ«ГѕГ·ГҐГ­. ГЏГ°Г®ГўГҐГ°ГЄГ : /paytgtest', -1)
 end
 
 local function telegramTestCommand()
-    local preview = '<DIAMOND> <b>ТЕСТОВЫЙ ПРЕДПРОСМОТР</b>'
+    local preview = '<DIAMOND> <b>Г’Г…Г‘Г’ГЋГ‚Г›Г‰ ГЏГђГ…Г„ГЏГђГЋГ‘ГЊГЋГ’Гђ</b>'
         .. string.char(10) .. string.char(10)
         .. telegramMessage()
 
@@ -699,20 +699,20 @@ end
 
 local function telegramEnableCommand()
     if not telegramCredentialsValid(ini.telegram.token, ini.telegram.chat_id) then
-        sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Сначала настрой: /paytg TOKEN CHAT_ID', -1)
+        sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Г‘Г­Г Г·Г Г«Г  Г­Г Г±ГІГ°Г®Г©: /paytg TOKEN CHAT_ID', -1)
         return
     end
 
     ini.telegram.enabled = true
     inicfg.save(ini, CONFIG)
-    sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Уведомления включены.', -1)
+    sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Г“ГўГҐГ¤Г®Г¬Г«ГҐГ­ГЁГї ГўГЄГ«ГѕГ·ГҐГ­Г».', -1)
 end
 
 local function telegramDisableCommand()
     ini.telegram.enabled = false
     telegramQueue = {}
     inicfg.save(ini, CONFIG)
-    sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}Уведомления выключены. Очередь очищена.', -1)
+    sampAddChatMessage('{FFB84D}[PayDay TG] {FFFFFF}Г“ГўГҐГ¤Г®Г¬Г«ГҐГ­ГЁГї ГўГ»ГЄГ«ГѕГ·ГҐГ­Г». ГЋГ·ГҐГ°ГҐГ¤Гј Г®Г·ГЁГ№ГҐГ­Г .', -1)
 end
 
 markPayday = function()
@@ -746,13 +746,13 @@ markPayday = function()
             ini.rank.repaid = cost
             ini.rank.completed = true
             ini.rank.tracking = false
-            statusText = 'Ранг окуплен'
-            sampAddChatMessage('{55DD88}[PayDay Helper] {FFFFFF}Ранг окуплен. Красавчик.', -1)
+            statusText = 'ГђГ Г­ГЈ Г®ГЄГіГЇГ«ГҐГ­'
+            sampAddChatMessage('{55DD88}[PayDay Helper] {FFFFFF}ГђГ Г­ГЈ Г®ГЄГіГЇГ«ГҐГ­. ГЉГ°Г Г±Г ГўГ·ГЁГЄ.', -1)
         else
-            statusText = 'PayDay учтен в окупаемости'
+            statusText = 'PayDay ГіГ·ГІГҐГ­ Гў Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГЁ'
         end
     else
-        statusText = 'PayDay учтен'
+        statusText = 'PayDay ГіГ·ГІГҐГ­'
     end
 
     inicfg.save(ini, CONFIG)
@@ -766,12 +766,12 @@ function sampev.onServerMessage(color, text)
     text = stripColors(text)
     local nums = extractNumbers(text)
 
-    local isBankLine = hasText(text, 'Текущая сумма в банке')
-        or hasText(text, 'Сумма в банке')
-        or hasText(text, 'Банковский счет')
+    local isBankLine = hasText(text, 'Г’ГҐГЄГіГ№Г Гї Г±ГіГ¬Г¬Г  Гў ГЎГ Г­ГЄГҐ')
+        or hasText(text, 'Г‘ГіГ¬Г¬Г  Гў ГЎГ Г­ГЄГҐ')
+        or hasText(text, 'ГЃГ Г­ГЄГ®ГўГ±ГЄГЁГ© Г±Г·ГҐГІ')
 
     if isBankLine then
-        -- Повторная строка банковского чека не должна стирать уже считанные части PayDay.
+        -- ГЏГ®ГўГІГ®Г°Г­Г Гї Г±ГІГ°Г®ГЄГ  ГЎГ Г­ГЄГ®ГўГ±ГЄГ®ГЈГ® Г·ГҐГЄГ  Г­ГҐ Г¤Г®Г«Г¦Г­Г  Г±ГІГЁГ°Г ГІГј ГіГ¦ГҐ Г±Г·ГЁГІГ Г­Г­Г»ГҐ Г·Г Г±ГІГЁ PayDay.
         if not paydayPending then
             ini.stats.bank_plus = 0
             ini.stats.deposit_plus = 0
@@ -782,33 +782,33 @@ function sampev.onServerMessage(color, text)
 
         if nums[1] ~= nil then ini.stats.bank = nums[1] end
         if nums[2] ~= nil then ini.stats.bank_plus = nums[2] end
-        statusText = 'Считываю банковский чек'
+        statusText = 'Г‘Г·ГЁГІГ»ГўГ Гѕ ГЎГ Г­ГЄГ®ГўГ±ГЄГЁГ© Г·ГҐГЄ'
     end
 
-    local isDepositLine = hasText(text, 'Текущая сумма на депозите')
-        or hasText(text, 'Сумма на депозите')
-        or hasText(text, 'Депозитный счет')
-        or (paydayPending and hasText(text, 'депозите'))
+    local isDepositLine = hasText(text, 'Г’ГҐГЄГіГ№Г Гї Г±ГіГ¬Г¬Г  Г­Г  Г¤ГҐГЇГ®Г§ГЁГІГҐ')
+        or hasText(text, 'Г‘ГіГ¬Г¬Г  Г­Г  Г¤ГҐГЇГ®Г§ГЁГІГҐ')
+        or hasText(text, 'Г„ГҐГЇГ®Г§ГЁГІГ­Г»Г© Г±Г·ГҐГІ')
+        or (paydayPending and hasText(text, 'Г¤ГҐГЇГ®Г§ГЁГІГҐ'))
 
     if isDepositLine then
         if nums[1] ~= nil then ini.stats.deposit = nums[1] end
         if nums[2] ~= nil then ini.stats.deposit_plus = nums[2] end
     end
 
-    -- Учитываем только строку баланса донат-счёта.
-    -- Сообщения о VIP-талонах тоже содержат "AZ Coins", но это предметы,
-    -- поэтому они не должны попадать в статистику обычных AZ.
-    local isAzBalanceLine = hasText(text, 'Баланс на донат-счет')
-        or hasText(text, 'Баланс на донат-счёт')
-        or hasText(text, 'Баланс донат-счета')
-        or hasText(text, 'Баланс донат-счёта')
+    -- Г“Г·ГЁГІГ»ГўГ ГҐГ¬ ГІГ®Г«ГјГЄГ® Г±ГІГ°Г®ГЄГі ГЎГ Г«Г Г­Г±Г  Г¤Г®Г­Г ГІ-Г±Г·ВёГІГ .
+    -- Г‘Г®Г®ГЎГ№ГҐГ­ГЁГї Г® VIP-ГІГ Г«Г®Г­Г Гµ ГІГ®Г¦ГҐ Г±Г®Г¤ГҐГ°Г¦Г ГІ "AZ Coins", Г­Г® ГЅГІГ® ГЇГ°ГҐГ¤Г¬ГҐГІГ»,
+    -- ГЇГ®ГЅГІГ®Г¬Гі Г®Г­ГЁ Г­ГҐ Г¤Г®Г«Г¦Г­Г» ГЇГ®ГЇГ Г¤Г ГІГј Гў Г±ГІГ ГІГЁГ±ГІГЁГЄГі Г®ГЎГ»Г·Г­Г»Гµ AZ.
+    local isAzBalanceLine = hasText(text, 'ГЃГ Г«Г Г­Г± Г­Г  Г¤Г®Г­Г ГІ-Г±Г·ГҐГІ')
+        or hasText(text, 'ГЃГ Г«Г Г­Г± Г­Г  Г¤Г®Г­Г ГІ-Г±Г·ВёГІ')
+        or hasText(text, 'ГЃГ Г«Г Г­Г± Г¤Г®Г­Г ГІ-Г±Г·ГҐГІГ ')
+        or hasText(text, 'ГЃГ Г«Г Г­Г± Г¤Г®Г­Г ГІ-Г±Г·ВёГІГ ')
 
     if isAzBalanceLine then
         if nums[1] ~= nil then ini.stats.az_balance = nums[1] end
         if nums[2] ~= nil then ini.stats.az_plus = nums[2] end
     end
 
-    if hasText(text, 'Общая заработанная плата') or hasText(text, 'Общая заработная плата') or hasText(text, 'Зарплата организации') then
+    if hasText(text, 'ГЋГЎГ№Г Гї Г§Г Г°Г ГЎГ®ГІГ Г­Г­Г Гї ГЇГ«Г ГІГ ') or hasText(text, 'ГЋГЎГ№Г Гї Г§Г Г°Г ГЎГ®ГІГ­Г Гї ГЇГ«Г ГІГ ') or hasText(text, 'Г‡Г Г°ГЇГ«Г ГІГ  Г®Г°ГЈГ Г­ГЁГ§Г Г¶ГЁГЁ') then
         if nums[1] ~= nil then
             ini.stats.salary = nums[1]
             paydayPending = true
@@ -824,7 +824,7 @@ local function setMenuState(state)
 
     window[0] = state
 
-    -- Передаем управление курсором интерфейсу, чтобы камера игры не дергала мышь.
+    -- ГЏГҐГ°ГҐГ¤Г ГҐГ¬ ГіГЇГ°Г ГўГ«ГҐГ­ГЁГҐ ГЄГіГ°Г±Г®Г°Г®Г¬ ГЁГ­ГІГҐГ°ГґГҐГ©Г±Гі, Г·ГІГ®ГЎГ» ГЄГ Г¬ГҐГ°Г  ГЁГЈГ°Г» Г­ГҐ Г¤ГҐГ°ГЈГ Г«Г  Г¬Г»ГёГј.
     pcall(function()
         if state then
             sampSetCursorMode(2)
@@ -900,27 +900,27 @@ end
 local function drawBankTab()
     imgui.SetCursorPos(imgui.ImVec2(260, 100))
     imgui.SetWindowFontScale(1.15)
-    imgui.Text(u8'Банковский чек')
+    imgui.Text(u8'ГЃГ Г­ГЄГ®ГўГ±ГЄГЁГ© Г·ГҐГЄ')
     imgui.SetWindowFontScale(1.0)
 
     imgui.SetCursorPos(imgui.ImVec2(260, 126))
-    textMuted('Автоматически обновляется после PayDay')
+    textMuted('ГЂГўГІГ®Г¬Г ГІГЁГ·ГҐГ±ГЄГЁ Г®ГЎГ­Г®ГўГ«ГїГҐГІГ±Гї ГЇГ®Г±Г«ГҐ PayDay')
 
-    card('bank_now', 260, 160, 340, 78, 'Банк сейчас', money(ini.stats.bank), 0)
-    card('deposit_now', 620, 160, 340, 78, 'Депозит сейчас', money(ini.stats.deposit), 0)
+    card('bank_now', 260, 160, 340, 78, 'ГЃГ Г­ГЄ Г±ГҐГ©Г·Г Г±', money(ini.stats.bank), 0)
+    card('deposit_now', 620, 160, 340, 78, 'Г„ГҐГЇГ®Г§ГЁГІ Г±ГҐГ©Г·Г Г±', money(ini.stats.deposit), 0)
 
-    card('salary_total', 260, 252, 340, 78, 'Всего зарплаты', money(ini.stats.total_salary), 1)
-    card('deposit_total', 620, 252, 340, 78, 'Всего с депозита', money(ini.stats.total_deposit), 1)
+    card('salary_total', 260, 252, 340, 78, 'Г‚Г±ГҐГЈГ® Г§Г Г°ГЇГ«Г ГІГ»', money(ini.stats.total_salary), 1)
+    card('deposit_total', 620, 252, 340, 78, 'Г‚Г±ГҐГЈГ® Г± Г¤ГҐГЇГ®Г§ГЁГІГ ', money(ini.stats.total_deposit), 1)
 
     beginPanel('stats_panel', 260, 348, 700, 110)
-    textMuted('СТАТИСТИКА')
-    row('Количество PayDay', tostring(ini.stats.paydays), 0, 420)
-    row('Общий доход', money((tonumber(ini.stats.total_salary) or 0) + (tonumber(ini.stats.total_deposit) or 0)), 2, 420)
-    row('Получено AZ Coins', tostring(ini.stats.total_az) .. ' AZ', 1, 420)
+    textMuted('Г‘Г’ГЂГ’Г€Г‘Г’Г€ГЉГЂ')
+    row('ГЉГ®Г«ГЁГ·ГҐГ±ГІГўГ® PayDay', tostring(ini.stats.paydays), 0, 420)
+    row('ГЋГЎГ№ГЁГ© Г¤Г®ГµГ®Г¤', money((tonumber(ini.stats.total_salary) or 0) + (tonumber(ini.stats.total_deposit) or 0)), 2, 420)
+    row('ГЏГ®Г«ГіГ·ГҐГ­Г® AZ Coins', tostring(ini.stats.total_az) .. ' AZ', 1, 420)
     endPanel()
 
     beginPanel('forecast_panel', 260, 476, 700, 78)
-    textMuted('ПРОГНОЗ')
+    textMuted('ГЏГђГЋГѓГЌГЋГ‡')
     imgui.PushItemWidth(80)
     if imgui.InputInt('##forecastPaydays', forecastPaydays, 1, 10) then
         if forecastPaydays[0] < 1 then forecastPaydays[0] = 1 end
@@ -929,20 +929,20 @@ local function drawBankTab()
     imgui.SameLine()
     imgui.Text(u8'PayDay')
     imgui.SameLine(250)
-    textValue('Итого: ' .. money(paydayIncome() * forecastPaydays[0]), 1)
+    textValue('Г€ГІГ®ГЈГ®: ' .. money(paydayIncome() * forecastPaydays[0]), 1)
     imgui.SameLine(520)
     textMuted(timeFromPaydays(forecastPaydays[0]))
     endPanel()
 
     imgui.SetCursorPos(imgui.ImVec2(260, 575))
-    if imgui.Button(u8'Сбросить статистику', imgui.ImVec2(220, 36)) then
+    if imgui.Button(u8'Г‘ГЎГ°Г®Г±ГЁГІГј Г±ГІГ ГІГЁГ±ГІГЁГЄГі', imgui.ImVec2(220, 36)) then
         ini.stats.paydays = 0
         ini.stats.total_salary = 0
         ini.stats.total_deposit = 0
         ini.stats.total_az = 0
-        ini.stats.last_payday = 'Нет данных'
+        ini.stats.last_payday = 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ'
         inicfg.save(ini, CONFIG)
-        statusText = 'Статистика сброшена'
+        statusText = 'Г‘ГІГ ГІГЁГ±ГІГЁГЄГ  Г±ГЎГ°Г®ГёГҐГ­Г '
     end
 end
 
@@ -965,30 +965,30 @@ end
 local function drawRankTab()
     imgui.SetCursorPos(imgui.ImVec2(260, 100))
     imgui.SetWindowFontScale(1.15)
-    imgui.Text(u8'Окупаемость ранга')
+    imgui.Text(u8'ГЋГЄГіГЇГ ГҐГ¬Г®Г±ГІГј Г°Г Г­ГЈГ ')
     imgui.SetWindowFontScale(1.0)
 
     imgui.SetCursorPos(imgui.ImVec2(260, 126))
-    textMuted('Введи цену ранга и обычную зарплату x1. Бонус x2/x3/x4 определяется автоматически.')
+    textMuted('Г‚ГўГҐГ¤ГЁ Г¶ГҐГ­Гі Г°Г Г­ГЈГ  ГЁ Г®ГЎГ»Г·Г­ГіГѕ Г§Г Г°ГЇГ«Г ГІГі x1. ГЃГ®Г­ГіГ± x2/x3/x4 Г®ГЇГ°ГҐГ¤ГҐГ«ГїГҐГІГ±Гї Г ГўГІГ®Г¬Г ГІГЁГ·ГҐГ±ГЄГЁ.')
 
     beginPanel('rank_input_panel', 260, 160, 700, 158)
-    inputTextLine('rank_number', 'Номер ранга', rankNumberText, 18)
-    inputTextLine('rank_cost', 'Цена покупки, $', rankCostText, 54)
-    inputTextLine('rank_salary', 'Зарплата x1, $', rankSalaryText, 90)
+    inputTextLine('rank_number', 'ГЌГ®Г¬ГҐГ° Г°Г Г­ГЈГ ', rankNumberText, 18)
+    inputTextLine('rank_cost', 'Г–ГҐГ­Г  ГЇГ®ГЄГіГЇГЄГЁ, $', rankCostText, 54)
+    inputTextLine('rank_salary', 'Г‡Г Г°ГЇГ«Г ГІГ  x1, $', rankSalaryText, 90)
 
     imgui.SetCursorPos(imgui.ImVec2(18, 124))
-    if imgui.Checkbox(u8'Учитывать депозит', useDeposit) then
+    if imgui.Checkbox(u8'Г“Г·ГЁГІГ»ГўГ ГІГј Г¤ГҐГЇГ®Г§ГЁГІ', useDeposit) then
         ini.rank.use_deposit = useDeposit[0]
         inicfg.save(ini, CONFIG)
     end
     imgui.SetCursorPos(imgui.ImVec2(250, 124))
-    if imgui.Checkbox(u8'Мини-окно в игре', miniEnabled) then
+    if imgui.Checkbox(u8'ГЊГЁГ­ГЁ-Г®ГЄГ­Г® Гў ГЁГЈГ°ГҐ', miniEnabled) then
         ini.ui.mini = miniEnabled[0]
         inicfg.save(ini, CONFIG)
     end
     endPanel()
 
-    -- Для живого расчета читаем буферы, но не пишем INI на каждую цифру.
+    -- Г„Г«Гї Г¦ГЁГўГ®ГЈГ® Г°Г Г±Г·ГҐГІГ  Г·ГЁГІГ ГҐГ¬ ГЎГіГґГҐГ°Г», Г­Г® Г­ГҐ ГЇГЁГёГҐГ¬ INI Г­Г  ГЄГ Г¦Г¤ГіГѕ Г¶ГЁГґГ°Гі.
     syncRankValuesFromText()
     ini.rank.number = rankNumber[0]
     ini.rank.cost = rankCost[0]
@@ -997,11 +997,11 @@ local function drawRankTab()
     local st = rankStats()
 
     beginPanel('rank_now_panel', 260, 330, 700, 122)
-    textMuted('ТЕКУЩИЙ РАСЧЕТ ЗАРПЛАТЫ')
-    row('Обычная зарплата x1', money(st.baseSalary), 0, 430)
-    row('Получено за последний PayDay', money(st.currentSalary), 1, 430)
-    row('Определенный бонус', multiplierText(st.multiplier), 1, 430)
-    row('Доход в окупаемость за PayDay', money(st.currentIncome), 2, 430)
+    textMuted('Г’Г…ГЉГ“Г™Г€Г‰ ГђГЂГ‘Г—Г…Г’ Г‡ГЂГђГЏГ‹ГЂГ’Г›')
+    row('ГЋГЎГ»Г·Г­Г Гї Г§Г Г°ГЇГ«Г ГІГ  x1', money(st.baseSalary), 0, 430)
+    row('ГЏГ®Г«ГіГ·ГҐГ­Г® Г§Г  ГЇГ®Г±Г«ГҐГ¤Г­ГЁГ© PayDay', money(st.currentSalary), 1, 430)
+    row('ГЋГЇГ°ГҐГ¤ГҐГ«ГҐГ­Г­Г»Г© ГЎГ®Г­ГіГ±', multiplierText(st.multiplier), 1, 430)
+    row('Г„Г®ГµГ®Г¤ Гў Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГј Г§Г  PayDay', money(st.currentIncome), 2, 430)
     endPanel()
 
     beginPanel('rank_result_panel', 260, 464, 700, 126)
@@ -1009,52 +1009,52 @@ local function drawRankTab()
         imgui.ProgressBar(st.progress, imgui.ImVec2(660, 18), u8(string.format('%.1f%%', st.progress * 100)))
 
         imgui.SetCursorPos(imgui.ImVec2(16, 46))
-        textValue('Осталось: ' .. tostring(st.remainingX1) .. ' ПД x1', 1)
+        textValue('ГЋГ±ГІГ Г«Г®Г±Гј: ' .. tostring(st.remainingX1) .. ' ГЏГ„ x1', 1)
         imgui.SetCursorPos(imgui.ImVec2(16, 72))
-        imgui.Text(u8('Реальных ПД сейчас: ' .. tostring(st.remainingReal)))
+        imgui.Text(u8('ГђГҐГ Г«ГјГ­Г»Гµ ГЏГ„ Г±ГҐГ©Г·Г Г±: ' .. tostring(st.remainingReal)))
         imgui.SetCursorPos(imgui.ImVec2(16, 94))
-        imgui.Text(u8('Время примерно: ' .. timeFromPaydays(st.remainingReal)))
+        imgui.Text(u8('Г‚Г°ГҐГ¬Гї ГЇГ°ГЁГ¬ГҐГ°Г­Г®: ' .. timeFromPaydays(st.remainingReal)))
 
         imgui.SetCursorPos(imgui.ImVec2(360, 46))
-        imgui.Text(u8('Осталось денег: ' .. money(st.remaining)))
+        imgui.Text(u8('ГЋГ±ГІГ Г«Г®Г±Гј Г¤ГҐГ­ГҐГЈ: ' .. money(st.remaining)))
         imgui.SetCursorPos(imgui.ImVec2(360, 72))
-        textValue('Уже возвращено: ' .. money(st.repaid), 2)
+        textValue('Г“Г¦ГҐ ГўГ®Г§ГўГ°Г Г№ГҐГ­Г®: ' .. money(st.repaid), 2)
         imgui.SetCursorPos(imgui.ImVec2(360, 94))
-        imgui.Text(u8(string.format('Зачтено: %.1f ПД x1', st.x1Done)))
+        imgui.Text(u8(string.format('Г‡Г Г·ГІГҐГ­Г®: %.1f ГЏГ„ x1', st.x1Done)))
     else
-        textMuted('Заполни цену ранга и зарплату x1.')
+        textMuted('Г‡Г ГЇГ®Г«Г­ГЁ Г¶ГҐГ­Гі Г°Г Г­ГЈГ  ГЁ Г§Г Г°ГЇГ«Г ГІГі x1.')
     end
     endPanel()
 
     imgui.SetCursorPos(imgui.ImVec2(260, 604))
-    if imgui.Button(u8'Сохранить', imgui.ImVec2(140, 36)) then
+    if imgui.Button(u8'Г‘Г®ГµГ°Г Г­ГЁГІГј', imgui.ImVec2(140, 36)) then
         saveRankInputs()
-        statusText = 'Данные ранга сохранены'
+        statusText = 'Г„Г Г­Г­Г»ГҐ Г°Г Г­ГЈГ  Г±Г®ГµГ°Г Г­ГҐГ­Г»'
     end
 
     imgui.SameLine()
 
     if asBool(ini.rank.tracking) then
-        if imgui.Button(u8'Пауза', imgui.ImVec2(140, 36)) then
+        if imgui.Button(u8'ГЏГ ГіГ§Г ', imgui.ImVec2(140, 36)) then
             saveRankInputs()
             ini.rank.tracking = false
             inicfg.save(ini, CONFIG)
-            statusText = 'Счетчик остановлен'
+            statusText = 'Г‘Г·ГҐГІГ·ГЁГЄ Г®Г±ГІГ Г­Г®ГўГ«ГҐГ­'
         end
     else
-        local label = 'Начать отсчет'
-        if tostring(ini.rank.started) ~= 'Нет данных' and not asBool(ini.rank.completed) then
-            label = 'Продолжить'
+        local label = 'ГЌГ Г·Г ГІГј Г®ГІГ±Г·ГҐГІ'
+        if tostring(ini.rank.started) ~= 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ' and not asBool(ini.rank.completed) then
+            label = 'ГЏГ°Г®Г¤Г®Г«Г¦ГЁГІГј'
         end
         if asBool(ini.rank.completed) then
-            label = 'Заново'
+            label = 'Г‡Г Г­Г®ГўГ®'
         end
 
         if imgui.Button(u8(label), imgui.ImVec2(160, 36)) then
             saveRankInputs()
 
             if rankCost[0] > 0 and rankSalary[0] > 0 then
-                if tostring(ini.rank.started) == 'Нет данных' or asBool(ini.rank.completed) then
+                if tostring(ini.rank.started) == 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ' or asBool(ini.rank.completed) then
                     ini.rank.repaid = 0
                     ini.rank.caught_paydays = 0
                     ini.rank.started = os.date('%d.%m.%Y %H:%M:%S')
@@ -1063,24 +1063,24 @@ local function drawRankTab()
 
                 ini.rank.tracking = true
                 inicfg.save(ini, CONFIG)
-                statusText = 'Отсчет окупаемости запущен'
-                sampAddChatMessage('{55DD88}[PayDay Helper] {FFFFFF}Отсчет окупаемости запущен.', -1)
+                statusText = 'ГЋГІГ±Г·ГҐГІ Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГЁ Г§Г ГЇГіГ№ГҐГ­'
+                sampAddChatMessage('{55DD88}[PayDay Helper] {FFFFFF}ГЋГІГ±Г·ГҐГІ Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГЁ Г§Г ГЇГіГ№ГҐГ­.', -1)
             else
-                statusText = 'Укажи цену и зарплату x1'
+                statusText = 'Г“ГЄГ Г¦ГЁ Г¶ГҐГ­Гі ГЁ Г§Г Г°ГЇГ«Г ГІГі x1'
             end
         end
     end
 
     imgui.SameLine()
 
-    if imgui.Button(u8'Сброс прогресса', imgui.ImVec2(170, 36)) then
+    if imgui.Button(u8'Г‘ГЎГ°Г®Г± ГЇГ°Г®ГЈГ°ГҐГ±Г±Г ', imgui.ImVec2(170, 36)) then
         ini.rank.tracking = false
         ini.rank.repaid = 0
         ini.rank.caught_paydays = 0
-        ini.rank.started = 'Нет данных'
+        ini.rank.started = 'ГЌГҐГІ Г¤Г Г­Г­Г»Гµ'
         ini.rank.completed = false
         inicfg.save(ini, CONFIG)
-        statusText = 'Прогресс сброшен'
+        statusText = 'ГЏГ°Г®ГЈГ°ГҐГ±Г± Г±ГЎГ°Г®ГёГҐГ­'
     end
 end
 
@@ -1092,7 +1092,7 @@ local function drawTelegramTab()
     imgui.SetWindowFontScale(1.0)
 
     imgui.SetCursorPos(imgui.ImVec2(260, 126))
-    textMuted('Вставь token и chat ID сюда. Игровой чат больше не нужен.')
+    textMuted('Г‚Г±ГІГ ГўГј token ГЁ chat ID Г±ГѕГ¤Г . Г€ГЈГ°Г®ГўГ®Г© Г·Г ГІ ГЎГ®Г«ГјГёГҐ Г­ГҐ Г­ГіГ¦ГҐГ­.')
 
     beginPanel('telegram_panel', 260, 160, 700, 260)
 
@@ -1111,30 +1111,30 @@ local function drawTelegramTab()
     imgui.PopItemWidth()
 
     imgui.SetCursorPos(imgui.ImVec2(18, 166))
-    if imgui.Button(u8'Сохранить и включить', imgui.ImVec2(210, 38)) then
+    if imgui.Button(u8'Г‘Г®ГµГ°Г Г­ГЁГІГј ГЁ ГўГЄГ«ГѕГ·ГЁГІГј', imgui.ImVec2(210, 38)) then
         local token = safeTelegramValue(stringFromBuffer(telegramTokenText))
         local chatId = safeTelegramValue(stringFromBuffer(telegramChatIdText))
 
         if not telegramCredentialsValid(token, chatId) then
-            statusText = 'Ошибка: проверь token и chat ID'
-            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Некорректный token или chat ID.', -1)
+            statusText = 'ГЋГёГЁГЎГЄГ : ГЇГ°Г®ГўГҐГ°Гј token ГЁ chat ID'
+            sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}ГЌГҐГЄГ®Г°Г°ГҐГЄГІГ­Г»Г© token ГЁГ«ГЁ chat ID.', -1)
         else
             ini.telegram.token = token
             ini.telegram.chat_id = chatId
             ini.telegram.enabled = true
             inicfg.save(ini, CONFIG)
-            statusText = 'Telegram сохранен и включен'
-            sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Telegram сохранен и включен.', -1)
+            statusText = 'Telegram Г±Г®ГµГ°Г Г­ГҐГ­ ГЁ ГўГЄГ«ГѕГ·ГҐГ­'
+            sampAddChatMessage('{55DD88}[PayDay TG] {FFFFFF}Telegram Г±Г®ГµГ°Г Г­ГҐГ­ ГЁ ГўГЄГ«ГѕГ·ГҐГ­.', -1)
         end
     end
 
     imgui.SameLine()
-    if imgui.Button(u8'Тест', imgui.ImVec2(110, 38)) then
+    if imgui.Button(u8'Г’ГҐГ±ГІ', imgui.ImVec2(110, 38)) then
         telegramTestCommand()
     end
 
     imgui.SameLine()
-    if imgui.Button(asBool(ini.telegram.enabled) and u8'Выключить' or u8'Включить', imgui.ImVec2(120, 38)) then
+    if imgui.Button(asBool(ini.telegram.enabled) and u8'Г‚Г»ГЄГ«ГѕГ·ГЁГІГј' or u8'Г‚ГЄГ«ГѕГ·ГЁГІГј', imgui.ImVec2(120, 38)) then
         if asBool(ini.telegram.enabled) then
             telegramDisableCommand()
         else
@@ -1144,9 +1144,9 @@ local function drawTelegramTab()
 
     imgui.SetCursorPos(imgui.ImVec2(18, 220))
     if asBool(ini.telegram.enabled) then
-        textValue('Статус: включено', 2)
+        textValue('Г‘ГІГ ГІГіГ±: ГўГЄГ«ГѕГ·ГҐГ­Г®', 2)
     else
-        textMuted('Статус: выключено')
+        textMuted('Г‘ГІГ ГІГіГ±: ГўГ»ГЄГ«ГѕГ·ГҐГ­Г®')
     end
 
     endPanel()
@@ -1155,9 +1155,9 @@ end
 local miniFrame = imgui.OnFrame(function()
     local st = rankStats()
 
-    -- Не рисуем мини-окно одновременно с главным меню.
-    -- Иначе miniFrame.HideCursor=true и mainFrame.HideCursor=false
-    -- каждый кадр спорят между собой, из-за чего курсор мигает при вводе текста.
+    -- ГЌГҐ Г°ГЁГ±ГіГҐГ¬ Г¬ГЁГ­ГЁ-Г®ГЄГ­Г® Г®Г¤Г­Г®ГўГ°ГҐГ¬ГҐГ­Г­Г® Г± ГЈГ«Г ГўГ­Г»Г¬ Г¬ГҐГ­Гѕ.
+    -- Г€Г­Г Г·ГҐ miniFrame.HideCursor=true ГЁ mainFrame.HideCursor=false
+    -- ГЄГ Г¦Г¤Г»Г© ГЄГ Г¤Г° Г±ГЇГ®Г°ГїГІ Г¬ГҐГ¦Г¤Гі Г±Г®ГЎГ®Г©, ГЁГ§-Г§Г  Г·ГҐГЈГ® ГЄГіГ°Г±Г®Г° Г¬ГЁГЈГ ГҐГІ ГЇГ°ГЁ ГўГўГ®Г¤ГҐ ГІГҐГЄГ±ГІГ .
     return miniEnabled[0] and not window[0] and st.cost > 0 and st.baseSalary > 0
 end, function()
     local sx, sy = getScreenResolution()
@@ -1176,10 +1176,10 @@ end, function()
     imgui.ProgressBar(st.progress, imgui.ImVec2(252, 18), u8(string.format('%.1f%%', st.progress * 100)))
 
     imgui.SetCursorPos(imgui.ImVec2(14, 58))
-    imgui.Text(u8('Осталось: ' .. tostring(st.remainingX1) .. ' ПД x1'))
+    imgui.Text(u8('ГЋГ±ГІГ Г«Г®Г±Гј: ' .. tostring(st.remainingX1) .. ' ГЏГ„ x1'))
 
     imgui.SetCursorPos(imgui.ImVec2(14, 78))
-    textMuted('Реально: ' .. tostring(st.remainingReal) .. ' ПД | ' .. money(st.remaining))
+    textMuted('ГђГҐГ Г«ГјГ­Г®: ' .. tostring(st.remainingReal) .. ' ГЏГ„ | ' .. money(st.remaining))
 
     imgui.End()
 end)
@@ -1197,7 +1197,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     imgui.SetWindowFontScale(1.22)
     imgui.Text(u8'PAYDAY HELPER')
     imgui.SetWindowFontScale(1.0)
-    textMuted('Arizona RP - зарплата, депозит и окупаемость ранга')
+    textMuted('Arizona RP - Г§Г Г°ГЇГ«Г ГІГ , Г¤ГҐГЇГ®Г§ГЁГІ ГЁ Г®ГЄГіГЇГ ГҐГ¬Г®Г±ГІГј Г°Г Г­ГЈГ ')
     imgui.SetCursorPos(imgui.ImVec2(926, 10))
     if imgui.Button('X##close_main', imgui.ImVec2(34, 32)) then
         setMenuState(false)
@@ -1205,15 +1205,15 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     endPanel()
 
     beginPanel('sidebar', 20, 92, 210, 548)
-    textMuted('МЕНЮ')
-    tabButton('Банковский чек', 1, 16, 42)
-    tabButton('Окупаемость', 2, 16, 90)
+    textMuted('ГЊГ…ГЌГћ')
+    tabButton('ГЃГ Г­ГЄГ®ГўГ±ГЄГЁГ© Г·ГҐГЄ', 1, 16, 42)
+    tabButton('ГЋГЄГіГЇГ ГҐГ¬Г®Г±ГІГј', 2, 16, 90)
     tabButton('Telegram', 3, 16, 138)
 
     imgui.SetCursorPos(imgui.ImVec2(16, 228))
     imgui.Separator()
     imgui.SetCursorPos(imgui.ImVec2(16, 248))
-    textMuted('СТАТУС')
+    textMuted('Г‘Г’ГЂГ’Г“Г‘')
     imgui.SetCursorPos(imgui.ImVec2(16, 272))
     imgui.PushTextWrapPos(190)
     textValue(statusText, 1)
@@ -1222,7 +1222,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     imgui.SetCursorPos(imgui.ImVec2(16, 334))
     textMuted('PayDay: ' .. tostring(ini.stats.paydays))
     imgui.SetCursorPos(imgui.ImVec2(16, 360))
-    textMuted('Последний:')
+    textMuted('ГЏГ®Г±Г«ГҐГ¤Г­ГЁГ©:')
     imgui.SetCursorPos(imgui.ImVec2(16, 382))
     imgui.PushTextWrapPos(190)
     textMuted(tostring(ini.stats.last_payday))
@@ -1234,17 +1234,17 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
         imgui.Separator()
         imgui.SetCursorPos(imgui.ImVec2(16, 440))
         if asBool(ini.rank.tracking) then
-            textValue('Счетчик активен', 2)
+            textValue('Г‘Г·ГҐГІГ·ГЁГЄ Г ГЄГІГЁГўГҐГ­', 2)
         elseif asBool(ini.rank.completed) then
-            textValue('Ранг окуплен', 2)
+            textValue('ГђГ Г­ГЈ Г®ГЄГіГЇГ«ГҐГ­', 2)
         else
-            textMuted('Счетчик на паузе')
+            textMuted('Г‘Г·ГҐГІГ·ГЁГЄ Г­Г  ГЇГ ГіГ§ГҐ')
         end
 
         imgui.SetCursorPos(imgui.ImVec2(16, 468))
-        textValue('Осталось: ' .. tostring(st.remainingX1) .. ' ПД x1', 1)
+        textValue('ГЋГ±ГІГ Г«Г®Г±Гј: ' .. tostring(st.remainingX1) .. ' ГЏГ„ x1', 1)
         imgui.SetCursorPos(imgui.ImVec2(16, 494))
-        textMuted('Реально: ' .. tostring(st.remainingReal) .. ' ПД')
+        textMuted('ГђГҐГ Г«ГјГ­Г®: ' .. tostring(st.remainingReal) .. ' ГЏГ„')
     end
     endPanel()
 
@@ -1282,7 +1282,7 @@ function main()
 
     print('[Arizona Payday Clean] Commands registered: /payday /paycalc /paytg /paytgtest /paytgon /paytgoff')
 
-    sampAddChatMessage('{FFD34E}[PayDay Helper] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Telegram работает через MoonLoader без внешних файлов', -1)
+    sampAddChatMessage('{FFD34E}[PayDay Helper] {FFFFFF}Г‚ГҐГ°Г±ГЁГї ' .. SCRIPT_VERSION .. ' Г§Г ГЈГ°ГіГ¦ГҐГ­Г . Telegram Г°Г ГЎГ®ГІГ ГҐГІ Г·ГҐГ°ГҐГ§ MoonLoader ГЎГҐГ§ ГўГ­ГҐГёГ­ГЁГµ ГґГ Г©Г«Г®Гў', -1)
 
     local lastMiniState = miniEnabled[0]
 
