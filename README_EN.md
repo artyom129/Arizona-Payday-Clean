@@ -4,12 +4,16 @@
 
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
-[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/version-1.6.5-F59E0B?style=for-the-badge)](#)
+[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
+[![Version](https://img.shields.io/badge/version-1.7.0-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
-[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
+[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
 [Русская версия](README.md) · **English**
+
+<br>
+
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-1.7.0-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -32,9 +36,10 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 1.6.5 |
+| **Version** | 1.7.0 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
+| **Main file** | `ArizonaPaydayClean.lua` |
 | **Configuration** | `moonloader/config/ArizonaPaydayClean.ini` |
 
 ---
@@ -142,7 +147,10 @@ That is how **Arizona Payday Clean** appeared.
 - enable and disable commands;
 - request queue;
 - stale-response protection;
-- no external processes.
+- no external processes;
+- premium HTML formatting;
+- smooth payback progress bar;
+- complete `/paytgtest` preview.
 
 </td>
 </tr>
@@ -150,20 +158,47 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
+## 🆕 What Is New in Version 1.7.0
+
+- completely redesigned Telegram notifications;
+- added bold text, structured sections, symbols, and emoji;
+- added a smooth payback progress bar;
+- percentage and progress bar no longer overlap;
+- added payback status and estimated remaining time;
+- `/paytgtest` now sends a complete preview;
+- fixed cursor flickering while typing in the Helper;
+- fixed regular AZ Coins tracking;
+- VIP AZ Coins tickets are not counted as regular AZ;
+- Telegram uses MoonLoader’s built-in asynchronous downloader.
+
 ## 📱 Telegram Notification Contents
 
-After Payday, the message may include:
+After Payday, the script sends a formatted report:
 
 ```text
-💰 Salary
-⚡ Detected multiplier
-🏦 Deposit income
-📊 Total Payday income
-💳 Current bank balance
-🏧 Current deposit balance
-🪙 AZ Coins balance
-📈 Rank payback progress
-⏳ Remaining amount and Payday count
+💎 ARIZONA PAYDAY
+━━━━━━━━━━━━━━━━━━
+✅ Payment received
+
+💰 INCOME
+├ Salary: $ 301.515
+├ Deposit: $ 229.748
+├ Bonus: x1
+└ Total: $ 531.263
+
+🏦 BALANCE
+├ Bank: $ 15.618.556
+├ Deposit: $ 269.659.328
+└ AZ Coins: 3.664  +2 AZ
+
+📈 RANK №8
+3.3%  •  Getting started
+▍░░░░░░░░░░░░░
+├ Repaid: $ ...
+├ Remaining: $ 241.859.093
+├ x1 forecast: 803 Paydays
+└ Current-income forecast: 803 Paydays
+⌛ Approximately: 16 d. 17 h.
 ```
 
 ---
@@ -182,15 +217,16 @@ After Payday, the message may include:
 
 ### Installing the Script
 
-1. Download the Lua file from the repository or **Releases**.
-2. Place it in:
+1. Open the [latest Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest) and download the Lua file.
+2. Rename it to `ArizonaPaydayClean.lua` when necessary.
+3. Place it in:
 
 ```text
 moonloader
 ```
 
-3. Launch the game.
-4. After loading, run:
+4. Launch the game.
+5. After loading, run:
 
 ```text
 /payday
@@ -208,7 +244,7 @@ moonloader
 | `/payday` | Open or close the main window |
 | `/paycalc` | Alternative command for opening the window |
 | `/paytg TOKEN CHAT_ID` | Save the Telegram token and chat ID, then enable notifications |
-| `/paytgtest` | Send a test message |
+| `/paytgtest` | Send a complete Telegram preview |
 | `/paytgon` | Enable Telegram notifications |
 | `/paytgoff` | Disable Telegram notifications |
 

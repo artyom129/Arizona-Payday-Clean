@@ -4,12 +4,16 @@
 
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
-[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/version-1.6.5-F59E0B?style=for-the-badge)](#)
+[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
+[![Version](https://img.shields.io/badge/version-1.7.0-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
-[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
+[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
 **Русский** · [English](README_EN.md)
+
+<br>
+
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-1.7.0-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -32,9 +36,10 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 1.6.5 |
+| **Версия** | 1.7.0 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
+| **Основной файл** | `ArizonaPaydayClean.lua` |
 | **Конфигурация** | `moonloader/config/ArizonaPaydayClean.ini` |
 
 ---
@@ -142,7 +147,10 @@
 - включение и отключение уведомлений;
 - очередь запросов;
 - защита от устаревших ответов;
-- отсутствие внешних процессов.
+- отсутствие внешних процессов;
+- премиальное HTML-оформление;
+- плавная полоса окупаемости;
+- полноценный предпросмотр `/paytgtest`.
 
 </td>
 </tr>
@@ -150,20 +158,47 @@
 
 ---
 
+## 🆕 Что нового в версии 1.7.0
+
+- полностью переработан дизайн Telegram-уведомлений;
+- добавлены жирный текст, разделы, символы и эмодзи;
+- добавлена плавная полоса прогресса окупаемости;
+- процент и полоса больше не накладываются друг на друга;
+- добавлены статус и примерное время до окупаемости;
+- `/paytgtest` отправляет полноценный предпросмотр;
+- исправлено мигание мыши при вводе текста в Helper;
+- исправлен учёт обычных AZ Coins;
+- VIP-талоны AZ Coins не считаются обычными AZ;
+- Telegram работает через встроенный асинхронный загрузчик MoonLoader.
+
 ## 📱 Что приходит в Telegram
 
-После Payday уведомление может содержать:
+После Payday приходит оформленный отчёт:
 
 ```text
-💰 Зарплата
-⚡ Определённый множитель
-🏦 Доход с депозита
-📊 Общий доход за Payday
-💳 Текущий баланс банка
-🏧 Текущую сумму на депозите
-🪙 Баланс AZ Coins
-📈 Прогресс окупаемости ранга
-⏳ Оставшуюся сумму и количество Payday
+💎 ARIZONA PAYDAY
+━━━━━━━━━━━━━━━━━━
+✅ Начисление успешно
+
+💰 ДОХОД
+├ Зарплата: $ 301.515
+├ Депозит: $ 229.748
+├ Бонус: x1
+└ Итого: $ 531.263
+
+🏦 БАЛАНС
+├ Банк: $ 15.618.556
+├ Депозит: $ 269.659.328
+└ AZ Coins: 3.664  +2 AZ
+
+📈 РАНГ №8
+3.3%  •  Начало пути
+▍░░░░░░░░░░░░░
+├ Возвращено: $ ...
+├ Осталось: $ 241.859.093
+├ Прогноз x1: 803 Payday
+└ По текущему доходу: 803 Payday
+⌛ Примерно: 16 д. 17 ч.
 ```
 
 ---
@@ -182,15 +217,16 @@
 
 ### Установка скрипта
 
-1. Скачай Lua-файл из репозитория или раздела **Releases**.
-2. Помести его в папку:
+1. Открой [последний Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest) и скачай Lua-файл.
+2. При необходимости переименуй файл в `ArizonaPaydayClean.lua`.
+3. Помести его в папку:
 
 ```text
 moonloader
 ```
 
-3. Запусти игру.
-4. После загрузки введи:
+4. Запусти игру.
+5. После загрузки введи:
 
 ```text
 /payday
@@ -208,7 +244,7 @@ moonloader
 | `/payday` | Открыть или закрыть главное окно |
 | `/paycalc` | Альтернативная команда открытия окна |
 | `/paytg TOKEN CHAT_ID` | Сохранить Telegram token и chat ID, затем включить уведомления |
-| `/paytgtest` | Отправить тестовое сообщение |
+| `/paytgtest` | Отправить полноценный тестовый предпросмотр |
 | `/paytgon` | Включить Telegram-уведомления |
 | `/paytgoff` | Выключить Telegram-уведомления |
 
