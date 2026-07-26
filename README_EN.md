@@ -66,7 +66,7 @@ Because of that, some parts of the code may look simple, some parts may not be t
 
 I no longer spend as much time in the game as I once did.
 
-Work takes up most of the day. I have a family. I train. There is an ordinary life outside the game that deserves attention.
+Work takes up most of the day. I train. There is an ordinary life outside the game that deserves attention.
 
 Because of that, my gameplay is fairly boring:
 
@@ -511,8 +511,6 @@ If you publish a modified version, it would be fair to keep a reference to the o
 ---
 
 ## ❤️ Thanks
-
-Thank you to my family for their support and understanding.
 
 Thank you to my friends and to the people who were with me during different periods of my life.
 
