@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-1.7.0-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.1-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-1.7.0-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.1-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 1.7.0 |
+| **Version** | 2.0.1 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -99,16 +99,15 @@ That is how **Arizona Payday Clean** appeared.
 <tr>
 <td width="50%" valign="top">
 
-### 📊 Statistics
+### 📊 Statistics and History
 
 - automatic Payday detection;
-- current bank balance;
-- current deposit balance;
-- salary from the latest Payday;
-- deposit income;
-- AZ Coins tracking;
-- Payday counter;
-- total income.
+- bank, deposit, and latest income;
+- lifetime statistics;
+- current-session analytics;
+- average income per Payday;
+- recent records in the interface;
+- full log in `ArizonaPaydayHistory.csv`.
 
 </td>
 <td width="50%" valign="top">
@@ -117,40 +116,35 @@ That is how **Arizona Payday Clean** appeared.
 
 - purchased-rank price;
 - x1 salary;
-- automatic multiplier detection;
+- multiplier detection;
 - optional deposit inclusion;
-- repaid amount;
-- remaining amount;
-- remaining Paydays;
-- estimated payback time.
+- repaid and remaining amounts;
+- Payday and time forecasts;
+- confirmation before progress reset.
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🖥 Interface
+### 🪙 AZ Coins
 
-- main `mimgui` window;
-- compact mini window;
-- dedicated Telegram tab;
-- persistent settings;
-- minimized-game support.
+- regular AZ Coins tracking;
+- separate AZ Coins ticket tracking;
+- VIP tickets are not mixed with the donation balance;
+- values are stored in history and Telegram reports.
 
 </td>
 <td width="50%" valign="top">
 
-### 📬 Telegram
+### 📬 Telegram and Monitoring
 
-- automatic Payday report;
-- test message;
-- enable and disable commands;
-- request queue;
-- stale-response protection;
-- no external processes;
-- premium HTML formatting;
+- premium HTML notifications;
 - smooth payback progress bar;
-- complete `/paytgtest` preview.
+- asynchronous request queue;
+- complete `/paytgtest` preview;
+- missed-Payday monitoring;
+- diagnostic log without external processes.
 
 </td>
 </tr>
@@ -158,18 +152,40 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 1.7.0
+## 🆕 What Is New in Version 2.0.1
 
-- completely redesigned Telegram notifications;
-- added bold text, structured sections, symbols, and emoji;
-- added a smooth payback progress bar;
-- percentage and progress bar no longer overlap;
-- added payback status and estimated remaining time;
-- `/paytgtest` now sends a complete preview;
-- fixed cursor flickering while typing in the Helper;
-- fixed regular AZ Coins tracking;
-- VIP AZ Coins tickets are not counted as regular AZ;
-- Telegram uses MoonLoader’s built-in asynchronous downloader.
+- added two-way Telegram bot commands through `getUpdates`;
+- the bot now responds to `/status`, `/stats`, `/today`, `/rank`, `/history`, `/watch`, and other commands;
+- added remote switches for Payday monitoring and automatic notifications;
+- the command list is registered automatically through `setMyCommands`;
+- the command menu is scoped to the saved `chat_id`;
+- messages from other chats are ignored;
+- command replies work even when automatic Payday notifications are disabled;
+- added the in-game commands `/paybot` and `/paytgcommands`;
+- added a built-in JSON decoder with no new dependencies;
+- persisted `update_offset` prevents duplicate command execution;
+- stale pending updates are discarded safely on first startup;
+- command handlers are protected with `pcall` so a response error cannot close the game;
+- added `retry_after`, timeout, and webhook-conflict handling;
+- temporary `ArizonaPaydayTelegramUpdates_*.json` files are removed after completion, timeout, and script shutdown;
+- history text is HTML-escaped before being sent;
+- polling now uses long polling to reduce request frequency.
+
+## What Was Included in Version 2.0.0
+
+- added the **Analytics** tab;
+- added current-session time, Payday, income, AZ, and ticket statistics;
+- added Payday history in `moonloader/config/ArizonaPaydayHistory.csv`;
+- regular AZ Coins and AZ Coins ticket items are tracked separately;
+- added `/paystats` and `/payhistory`;
+- added missed-Payday monitoring with an optional Telegram alert;
+- added `/paydebug` diagnostics;
+- added 1.7 configuration migration with an automatic backup;
+- statistics and payback resets now require a second confirmation;
+- fixed Telegram setting synchronization between `/paytg` and the UI;
+- fixed nested Telegram HTML formatting;
+- added cleanup for late Telegram response files;
+- retained the tested 1.7 fixes for minimized-game operation, regular AZ Coins, and cursor flickering.
 
 ## 📱 Telegram Notification Contents
 
@@ -215,25 +231,34 @@ After Payday, the script sends a formatted report:
 - `inicfg`;
 - standard MoonLoader libraries.
 
-### Installing the Script
+### Clean Installation
 
-1. Open the [latest Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest) and download the Lua file.
-2. Rename it to `ArizonaPaydayClean.lua` when necessary.
-3. Place it in:
+1. Open the [latest Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest).
+2. Download `ArizonaPaydayClean.lua` or the versioned file.
+3. Keep only **one** script version in `moonloader`.
+4. Place the file in:
 
 ```text
 moonloader
 ```
 
-4. Launch the game.
-5. After loading, run:
+5. Launch the game and run `/payday`.
+
+### Updating from 1.7
+
+1. Close the game completely.
+2. Remove the old Lua file, but **do not delete** `ArizonaPaydayClean.ini`.
+3. Place the new version in `moonloader`.
+4. On first launch, the script creates:
 
 ```text
-/payday
+moonloader/config/ArizonaPaydayClean_v1_backup.ini
 ```
 
+Telegram settings, statistics, and payback progress are preserved.
+
 > [!IMPORTANT]
-> Settings and statistics are stored locally in `moonloader/config/ArizonaPaydayClean.ini`.
+> Do not keep 1.7 and 2.0 together: both scripts may process the same Payday and register the same commands.
 
 ---
 
@@ -243,10 +268,18 @@ moonloader
 |---|---|
 | `/payday` | Open or close the main window |
 | `/paycalc` | Alternative command for opening the window |
+| `/paystats` | Show current-session statistics |
+| `/payhistory` | Show recent Payday records in game chat |
+| `/paywatch` | Enable or disable missed-Payday monitoring |
+| `/paydebug` | Enable or disable the diagnostic log |
 | `/paytg TOKEN CHAT_ID` | Save the Telegram token and chat ID, then enable notifications |
 | `/paytgtest` | Send a complete Telegram preview |
 | `/paytgon` | Enable Telegram notifications |
 | `/paytgoff` | Disable Telegram notifications |
+| `/paybot` | Enable or disable incoming Telegram commands |
+| `/paytgcommands` | Register the bot command menu again |
+
+`/payafk` remains as a compatibility alias for `/paywatch` from the beta build.
 
 ### Setup Example
 
@@ -283,6 +316,32 @@ For a group or channel, `chat_id` may be negative:
 /paytgtest
 ```
 
+7. Open the bot chat. The command menu should appear beside the input field within a few seconds.
+
+### Commands Inside Telegram
+
+| Bot command | Action |
+|---|---|
+| `/start` or `/help` | Show command help |
+| `/status` | Show script, last-Payday, and server-activity status |
+| `/stats` | Show all-time statistics |
+| `/today` | Show income and AZ for the current date |
+| `/rank` | Show current rank payback progress |
+| `/history 5` | Show between 1 and 10 recent Paydays |
+| `/watch` | Show Payday monitoring status |
+| `/watch_on` | Enable Payday monitoring |
+| `/watch_off` | Disable Payday monitoring |
+| `/notify_on` | Enable automatic post-Payday reports |
+| `/notify_off` | Disable automatic reports without disabling bot commands |
+| `/test` | Send a complete test Payday report |
+| `/version` | Show the script version |
+
+> [!IMPORTANT]
+> The script executes commands only from the `chat_id` saved in its settings. Updates from other chats are acknowledged through `update_offset`, but are ignored and receive no reply.
+
+> [!NOTE]
+> Telegram Bot API does not allow `getUpdates` while a webhook is configured. If a conflict is detected, the script shows a warning in game; remove the webhook from the service that installed it.
+
 ### Where Telegram Data Is Stored
 
 The bot token and `chat_id` are **not hardcoded into the Lua file**.
@@ -298,8 +357,25 @@ Recommended `.gitignore`:
 ```gitignore
 **/ArizonaPaydayClean.ini
 **/ArizonaPaydayTelegramResponse_*.json
+**/ArizonaPaydayTelegramUpdates_*.json
 moonloader.log
 ```
+
+---
+
+## 🗂 Local Files in 2.0
+
+| File | Purpose |
+|---|---|
+| `ArizonaPaydayClean.ini` | Settings and main statistics |
+| `ArizonaPaydayClean_v1_backup.ini` | Backup created before migration from 1.x |
+| `ArizonaPaydayHistory.csv` | Payday history for viewing and analysis |
+| `ArizonaPaydayTelegramResponse_*.json` | Temporary send-response file; removed automatically |
+| `ArizonaPaydayTelegramUpdates_*.json` | Temporary `getUpdates` response; removed automatically |
+| `ArizonaPaydayDebug.log` | Diagnostics created while `/paydebug` is enabled |
+
+> [!NOTE]
+> Payday monitoring is not an anti-AFK system. It does not move the character, press keys, or reconnect. It only warns when the next Payday is not detected after the first captured Payday.
 
 ---
 
