@@ -1,0 +1,66 @@
+name: Publish v2.0.12 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-v2.0.12.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify release file
+        shell: bash
+        run: |
+          test "$(sha256sum ArizonaPaydayClean.lua | cut -d ' ' -f 1)" = "ad0f78c2534c3fde277c161ddd7e36bd11723ba0b58e3ff2104d61f6ebb7930a"
+          grep -aFq "local SCRIPT_VERSION = '2.0.12'" ArizonaPaydayClean.lua
+
+      - name: Remove temporary release workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/publish-v2.0.12.yml
+          git commit -m "Remove temporary v2.0.12 release workflow"
+          git push
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Что изменено в v2.0.12
+
+          - Исправлено плавающее мини-окно: теперь его можно нормально перемещать.
+          - Добавлен отдельный режим перемещения с курсором и кнопкой **«Готово»**.
+          - Позиция мини-окна сохраняется в `ArizonaPaydayClean.ini` и восстанавливается после перезапуска.
+          - После смены разрешения окно автоматически возвращается в границы экрана.
+          - В обычном режиме мини-окно больше не перехватывает мышь и клавиатуру.
+          - Добавлены команды `/paymini`, `/paymini reset`, `/paymini on` и `/paymini off`.
+          - Исправлен резервный расчёт количества AZ-талонов по текущему балансу.
+          - Усилена защита от двойного учёта сообщений из чата, GameText, TextDraw и диалогов.
+          - Версия в интерфейсе и служебных сообщениях теперь берётся из `SCRIPT_VERSION`.
+
+          ## Установка
+
+          1. Скачайте единственный файл `ArizonaPaydayClean.lua` из раздела **Assets**.
+          2. Поместите его в папку `moonloader`.
+          3. Удалите старый Lua-файл или замените его; одновременно должна оставаться только одна версия скрипта.
+
+          Настройки и статистика из `moonloader/config/ArizonaPaydayClean.ini` сохраняются.
+          EOF
+          gh release create v2.0.12 ArizonaPaydayClean.lua \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$release_sha" \
+            --title "Arizona Payday Clean v2.0.12" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
