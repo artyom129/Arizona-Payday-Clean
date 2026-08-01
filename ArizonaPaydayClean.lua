@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.12'
+local SCRIPT_VERSION = '2.0.13'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -273,6 +273,7 @@ local new = imgui.new
 local window = new.bool(false)
 local miniEnabled = new.bool(asBool(ini.ui.mini))
 local miniMoveMode = false
+local miniDragging = false
 local miniPositionInitialized = false
 local miniPositionDirty = false
 local miniPosX = tonumber(ini.ui.mini_x) or -1
@@ -349,7 +350,10 @@ local MAIN_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.
 local PANEL_FLAGS = flags(W.NoScrollbar, W.NoScrollWithMouse)
 local MINI_WIDTH = 300
 local MINI_HEIGHT = 128
-local MINI_FLAGS = flags(W.NoDecoration, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings)
+-- Окно двигается нашей drag-зоной. Встроенное перемещение ImGui здесь
+-- ненадёжно: у NoDecoration нет заголовка, а некоторые сборки mimgui
+-- разрешают перемещение только за заголовок.
+local MINI_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings)
 local MINI_PASSIVE_FLAGS = flags(MINI_FLAGS, W.NoInputs)
 local INPUT_FLAGS = imgui.InputTextFlags or {}
 local TOKEN_INPUT_FLAGS = INPUT_FLAGS.Password or 0
@@ -714,6 +718,46 @@ local function saveMiniPosition()
     inicfg.save(ini, CONFIG)
 end
 
+local function setCurrentWindowPosition(x, y)
+    local pos = imgui.ImVec2(x, y)
+
+    -- В актуальном mimgui перегрузка ImGui::SetWindowPos(ImVec2, cond)
+    -- экспортируется как SetWindowPosVec2. Оставляем запасной вариант для
+    -- старых сборок, в которых она доступна под коротким именем.
+    if imgui.SetWindowPosVec2 then
+        imgui.SetWindowPosVec2(pos, imgui.Cond.Always)
+    elseif imgui.SetWindowPos then
+        imgui.SetWindowPos(pos, imgui.Cond.Always)
+    end
+end
+
+local function processMiniDrag(currentX, currentY)
+    imgui.SetCursorPos(imgui.ImVec2(0, 0))
+    imgui.InvisibleButton('##PaydayMiniDragArea', imgui.ImVec2(MINI_WIDTH, 30))
+
+    local active = imgui.IsItemActive() and imgui.IsMouseDown(0)
+    miniDragging = active
+
+    if not active or not imgui.IsMouseDragging(0, 0.0) then
+        return currentX, currentY
+    end
+
+    local delta = imgui.GetMouseDragDelta(0, 0.0)
+    local dx = tonumber(delta.x) or 0
+    local dy = tonumber(delta.y) or 0
+
+    if math.abs(dx) < 0.01 and math.abs(dy) < 0.01 then
+        return currentX, currentY
+    end
+
+    local nextX, nextY = clampMiniPosition(currentX + dx, currentY + dy)
+    setCurrentWindowPosition(nextX, nextY)
+    imgui.ResetMouseDragDelta(0)
+
+    miniPositionDirty = true
+    return nextX, nextY
+end
+
 local function setMiniMoveMode(state)
     state = state == true
 
@@ -725,11 +769,13 @@ local function setMiniMoveMode(state)
         ini.ui.mini = true
         window[0] = false
         miniMoveMode = true
+        miniDragging = false
         pcall(function() lockPlayerControl(true) end)
         statusText = 'Перетащи мини-окно мышью и нажми «Готово»'
         sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}Перетащи окно мышью. Для завершения нажми «Готово», ESC или введи /paymini.', -1)
     else
         miniMoveMode = false
+        miniDragging = false
         saveMiniPosition()
         pcall(function() lockPlayerControl(false) end)
         statusText = 'Позиция мини-окна сохранена'
@@ -3539,6 +3585,11 @@ end, function()
     if currentPosition then
         local currentX = tonumber(currentPosition.x) or miniPosX
         local currentY = tonumber(currentPosition.y) or miniPosY
+
+        if miniMoveMode then
+            currentX, currentY = processMiniDrag(currentX, currentY)
+        end
+
         if math.abs(currentX - miniPosX) > 0.5 or math.abs(currentY - miniPosY) > 0.5 then
             miniPosX, miniPosY = currentX, currentY
             miniPositionDirty = true
@@ -3546,7 +3597,7 @@ end, function()
     end
 
     imgui.SetCursorPos(imgui.ImVec2(14, 10))
-    textValue(miniMoveMode and 'ПЕРЕТАЩИ ОКНО' or 'PAYDAY RANK', 1)
+    textValue(miniMoveMode and (miniDragging and 'ПЕРЕМЕЩЕНИЕ...' or 'ЗАЖМИ И ТАЩИ ЗДЕСЬ') or 'PAYDAY RANK', 1)
     imgui.SetCursorPos(imgui.ImVec2(246, 10))
     textValue(multiplierText(st.multiplier), 2)
 
@@ -3574,6 +3625,7 @@ end, function()
     imgui.End()
 end)
 miniFrame.HideCursor = true
+miniFrame.LockPlayer = false
 
 local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     local sx, sy = getScreenResolution()
@@ -3655,6 +3707,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     imgui.End()
 end)
 mainFrame.HideCursor = false
+mainFrame.LockPlayer = true
 
 function main()
     while not isSampAvailable() do wait(50) end
@@ -3704,6 +3757,7 @@ function main()
         -- Явно разводим режимы курсора: мини-окно скрывает его только
         -- когда главное окно действительно закрыто.
         miniFrame.HideCursor = not miniMoveMode
+        miniFrame.LockPlayer = miniMoveMode
         mainFrame.HideCursor = false
 
         processTelegramTransport()
