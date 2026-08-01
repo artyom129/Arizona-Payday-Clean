@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.11'
+local SCRIPT_VERSION = '2.0.12'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -60,7 +60,9 @@ local ini = inicfg.load({
         completed = false
     },
     ui = {
-        mini = true
+        mini = true,
+        mini_x = -1,
+        mini_y = -1
     },
     telegram = {
         enabled = false,
@@ -143,6 +145,8 @@ setDefault(ini.rank, 'started', 'Нет данных')
 setDefault(ini.rank, 'completed', false)
 
 setDefault(ini.ui, 'mini', true)
+setDefault(ini.ui, 'mini_x', -1)
+setDefault(ini.ui, 'mini_y', -1)
 setDefault(ini.telegram, 'enabled', false)
 setDefault(ini.telegram, 'token', '')
 setDefault(ini.telegram, 'chat_id', '')
@@ -172,6 +176,8 @@ setDefault(ini.update, 'last_error', '')
 ini.stats.ticket_balance = tonumber(ini.stats.ticket_balance) or 0
 ini.stats.ticket_plus = tonumber(ini.stats.ticket_plus) or 0
 ini.stats.total_tickets = tonumber(ini.stats.total_tickets) or 0
+ini.ui.mini_x = tonumber(ini.ui.mini_x) or -1
+ini.ui.mini_y = tonumber(ini.ui.mini_y) or -1
 ini.stats.last_salary_received = ini.stats.last_salary_received == true
     or ini.stats.last_salary_received == 1
     or ini.stats.last_salary_received == '1'
@@ -266,6 +272,11 @@ end
 local new = imgui.new
 local window = new.bool(false)
 local miniEnabled = new.bool(asBool(ini.ui.mini))
+local miniMoveMode = false
+local miniPositionInitialized = false
+local miniPositionDirty = false
+local miniPosX = tonumber(ini.ui.mini_x) or -1
+local miniPosY = tonumber(ini.ui.mini_y) or -1
 local useDeposit = new.bool(asBool(ini.rank.use_deposit))
 local debugEnabled = new.bool(asBool(ini.app.debug))
 local afkEnabled = new.bool(asBool(ini.afk.enabled))
@@ -322,6 +333,7 @@ local recentTicketGain = 0
 local recentTicketAt = 0
 local lastTicketKey = ''
 local lastTicketAtMs = 0
+local TICKET_DUPLICATE_WINDOW_MS = 2500
 
 local W = imgui.WindowFlags or {}
 local function flags(...)
@@ -335,7 +347,10 @@ end
 
 local MAIN_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse)
 local PANEL_FLAGS = flags(W.NoScrollbar, W.NoScrollWithMouse)
-local MINI_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.AlwaysAutoResize)
+local MINI_WIDTH = 300
+local MINI_HEIGHT = 128
+local MINI_FLAGS = flags(W.NoDecoration, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings)
+local MINI_PASSIVE_FLAGS = flags(MINI_FLAGS, W.NoInputs)
 local INPUT_FLAGS = imgui.InputTextFlags or {}
 local TOKEN_INPUT_FLAGS = INPUT_FLAGS.Password or 0
 
@@ -666,7 +681,67 @@ local function saveRankInputs()
     ini.rank.salary_x1 = rankSalary[0]
     ini.rank.use_deposit = useDeposit[0]
     ini.ui.mini = miniEnabled[0]
+    if miniPositionInitialized then
+        ini.ui.mini_x = math.floor(miniPosX + 0.5)
+        ini.ui.mini_y = math.floor(miniPosY + 0.5)
+    end
     inicfg.save(ini, CONFIG)
+end
+
+local function defaultMiniPosition()
+    local screenWidth, screenHeight = getScreenResolution()
+    local x = math.max(8, screenWidth - MINI_WIDTH - 20)
+    local y = math.min(210, math.max(8, screenHeight - MINI_HEIGHT - 8))
+    return x, y
+end
+
+local function clampMiniPosition(x, y)
+    local screenWidth, screenHeight = getScreenResolution()
+    local maxX = math.max(8, screenWidth - MINI_WIDTH - 8)
+    local maxY = math.max(8, screenHeight - MINI_HEIGHT - 8)
+    x = clampNumber(x, 8, maxX)
+    y = clampNumber(y, 8, maxY)
+    return x, y
+end
+
+local function saveMiniPosition()
+    if not miniPositionInitialized then return end
+    miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
+    ini.ui.mini = miniEnabled[0]
+    ini.ui.mini_x = math.floor(miniPosX + 0.5)
+    ini.ui.mini_y = math.floor(miniPosY + 0.5)
+    miniPositionDirty = false
+    inicfg.save(ini, CONFIG)
+end
+
+local function setMiniMoveMode(state)
+    state = state == true
+
+    if state then
+        if window[0] then
+            saveRankInputs()
+        end
+        miniEnabled[0] = true
+        ini.ui.mini = true
+        window[0] = false
+        miniMoveMode = true
+        pcall(function() lockPlayerControl(true) end)
+        statusText = 'Перетащи мини-окно мышью и нажми «Готово»'
+        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}Перетащи окно мышью. Для завершения нажми «Готово», ESC или введи /paymini.', -1)
+    else
+        miniMoveMode = false
+        saveMiniPosition()
+        pcall(function() lockPlayerControl(false) end)
+        statusText = 'Позиция мини-окна сохранена'
+    end
+end
+
+local function resetMiniPosition()
+    miniPosX, miniPosY = defaultMiniPosition()
+    miniPositionInitialized = true
+    miniPositionDirty = true
+    saveMiniPosition()
+    statusText = 'Позиция мини-окна сброшена'
 end
 
 local function rankStats()
@@ -2048,7 +2123,7 @@ local function parseTicketAmounts(text, nums)
     local plus = plusRaw and cleanNumber(plusRaw) or 0
     local balance = balanceRaw and cleanNumber(balanceRaw) or 0
 
-    if plus <= 0 and nums and #nums > 0 then
+    if plus <= 0 and not balanceRaw and nums and #nums > 0 then
         plus = tonumber(nums[1]) or 0
     end
     if balance <= 0 and nums and #nums > 1 then
@@ -2089,6 +2164,13 @@ local function processTicketLine(text, nums, sourceName)
     local nowMs = getGameTimer()
     local cleanText = stripColors(text):gsub('%s+', ' ')
     local plus, balance = parseTicketAmounts(cleanText, nums)
+    local previousBalance = tonumber(ini.stats.ticket_balance) or 0
+
+    -- Некоторые варианты уведомления показывают только новый баланс талонов.
+    -- Раньше этот резервный расчёт стоял после раннего return и никогда не работал.
+    if plus <= 0 and balance > previousBalance then
+        plus = balance - previousBalance
+    end
 
     if plus <= 0 then
         debugLog('TICKET PARSE FAILED [' .. tostring(sourceName or 'unknown') .. ']: ' .. cleanText)
@@ -2100,7 +2182,7 @@ local function processTicketLine(text, nums, sourceName)
     local duplicateKey = tostring(plus) .. ':' .. tostring(balance)
     local duplicateElapsed = nowMs - lastTicketAtMs
     if duplicateKey == lastTicketKey
-        and duplicateElapsed >= 0 and duplicateElapsed <= 650 then
+        and duplicateElapsed >= 0 and duplicateElapsed <= TICKET_DUPLICATE_WINDOW_MS then
         debugLog('TICKET CROSS-EVENT DUPLICATE SKIPPED ['
             .. tostring(sourceName or 'unknown') .. ']: ' .. cleanText)
         return false
@@ -2109,11 +2191,6 @@ local function processTicketLine(text, nums, sourceName)
     lastTicketKey = duplicateKey
     lastTicketAtMs = nowMs
 
-    local previousBalance = tonumber(ini.stats.ticket_balance) or 0
-
-    if plus <= 0 and balance > previousBalance then
-        plus = balance - previousBalance
-    end
     if balance <= 0 and plus > 0 then
         balance = previousBalance + plus
     end
@@ -2455,6 +2532,9 @@ end
 
 local function setMenuState(state)
     state = state == true
+    if state and miniMoveMode then
+        setMiniMoveMode(false)
+    end
     if window[0] and not state then
         saveRankInputs()
     end
@@ -2466,6 +2546,33 @@ local function setMenuState(state)
     pcall(function()
         lockPlayerControl(state)
     end)
+end
+
+local function paydayMiniCommand(argument)
+    local action = tostring(argument or ''):match('^%s*(.-)%s*$'):lower()
+
+    if action == 'reset' then
+        resetMiniPosition()
+        miniEnabled[0] = true
+        ini.ui.mini = true
+        inicfg.save(ini, CONFIG)
+        sampAddChatMessage('{55DD88}[PayDay Mini] {FFFFFF}Позиция мини-окна сброшена.', -1)
+    elseif action == 'off' or action == 'hide' then
+        if miniMoveMode then setMiniMoveMode(false) end
+        miniEnabled[0] = false
+        ini.ui.mini = false
+        inicfg.save(ini, CONFIG)
+        sampAddChatMessage('{FFB84D}[PayDay Mini] {FFFFFF}Мини-окно выключено.', -1)
+    elseif action == 'on' or action == 'show' then
+        miniEnabled[0] = true
+        ini.ui.mini = true
+        inicfg.save(ini, CONFIG)
+        sampAddChatMessage('{55DD88}[PayDay Mini] {FFFFFF}Мини-окно включено.', -1)
+    elseif action == '' or action == 'move' then
+        setMiniMoveMode(not miniMoveMode)
+    else
+        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}/paymini — перемещение | /paymini reset | /paymini on | /paymini off', -1)
+    end
 end
 
 local function beginPanel(id, x, y, w, h)
@@ -2627,6 +2734,10 @@ local function drawRankTab()
     if imgui.Checkbox(u8'Мини-окно в игре', miniEnabled) then
         ini.ui.mini = miniEnabled[0]
         inicfg.save(ini, CONFIG)
+    end
+    imgui.SetCursorPos(imgui.ImVec2(470, 116))
+    if imgui.Button(u8'Переместить мини-окно', imgui.ImVec2(205, 30)) then
+        setMiniMoveMode(true)
     end
     endPanel()
 
@@ -3395,28 +3506,70 @@ local miniFrame = imgui.OnFrame(function()
     -- Не рисуем мини-окно одновременно с главным меню.
     -- Иначе miniFrame.HideCursor=true и mainFrame.HideCursor=false
     -- каждый кадр спорят между собой, из-за чего курсор мигает при вводе текста.
-    return miniEnabled[0] and not window[0] and st.cost > 0 and st.baseSalary > 0
+    return miniEnabled[0] and not window[0]
+        and (miniMoveMode or (st.cost > 0 and st.baseSalary > 0))
 end, function()
-    local sx, sy = getScreenResolution()
     local st = rankStats()
 
-    imgui.SetNextWindowPos(imgui.ImVec2(sx - 300, 210), imgui.Cond.Always)
-    imgui.SetNextWindowSize(imgui.ImVec2(280, 112), imgui.Cond.Always)
-    imgui.Begin('##PaydayMiniWindow', miniEnabled, MINI_FLAGS)
+    local forcePosition = false
+    if not miniPositionInitialized then
+        if miniPosX < 0 or miniPosY < 0 then
+            miniPosX, miniPosY = defaultMiniPosition()
+        end
+        miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
+        miniPositionInitialized = true
+        miniPositionDirty = true
+        forcePosition = true
+    else
+        local safeX, safeY = clampMiniPosition(miniPosX, miniPosY)
+        if math.abs(safeX - miniPosX) > 0.5 or math.abs(safeY - miniPosY) > 0.5 then
+            miniPosX, miniPosY = safeX, safeY
+            miniPositionDirty = true
+            forcePosition = true
+        end
+    end
+
+    if forcePosition then
+        imgui.SetNextWindowPos(imgui.ImVec2(miniPosX, miniPosY), imgui.Cond.Always)
+    end
+    imgui.SetNextWindowSize(imgui.ImVec2(MINI_WIDTH, MINI_HEIGHT), imgui.Cond.Always)
+    imgui.Begin('##PaydayMiniWindow', miniEnabled, miniMoveMode and MINI_FLAGS or MINI_PASSIVE_FLAGS)
+
+    local currentPosition = imgui.GetWindowPos()
+    if currentPosition then
+        local currentX = tonumber(currentPosition.x) or miniPosX
+        local currentY = tonumber(currentPosition.y) or miniPosY
+        if math.abs(currentX - miniPosX) > 0.5 or math.abs(currentY - miniPosY) > 0.5 then
+            miniPosX, miniPosY = currentX, currentY
+            miniPositionDirty = true
+        end
+    end
 
     imgui.SetCursorPos(imgui.ImVec2(14, 10))
-    textValue('PAYDAY RANK', 1)
-    imgui.SameLine(218)
+    textValue(miniMoveMode and 'ПЕРЕТАЩИ ОКНО' or 'PAYDAY RANK', 1)
+    imgui.SetCursorPos(imgui.ImVec2(246, 10))
     textValue(multiplierText(st.multiplier), 2)
 
     imgui.SetCursorPos(imgui.ImVec2(14, 32))
-    imgui.ProgressBar(st.progress, imgui.ImVec2(252, 18), u8(string.format('%.1f%%', st.progress * 100)))
+    imgui.ProgressBar(st.progress, imgui.ImVec2(272, 18), u8(string.format('%.1f%%', st.progress * 100)))
 
     imgui.SetCursorPos(imgui.ImVec2(14, 58))
     imgui.Text(u8('Осталось: ' .. tostring(st.remainingX1) .. ' ПД x1'))
 
     imgui.SetCursorPos(imgui.ImVec2(14, 78))
     textMuted('Реально: ' .. tostring(st.remainingReal) .. ' ПД | ' .. money(st.remaining))
+
+    if miniMoveMode then
+        imgui.SetCursorPos(imgui.ImVec2(14, 104))
+        textMuted('Позиция сохранится')
+        imgui.SetCursorPos(imgui.ImVec2(204, 99))
+        if imgui.Button(u8'Готово', imgui.ImVec2(82, 24)) then
+            setMiniMoveMode(false)
+        end
+    else
+        imgui.SetCursorPos(imgui.ImVec2(14, 104))
+        textMuted('/paymini — переместить')
+    end
 
     imgui.End()
 end)
@@ -3432,7 +3585,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
 
     beginPanel('topbar', 12, 10, 976, 62)
     imgui.SetWindowFontScale(1.22)
-    imgui.Text(u8'PAYDAY CENTER 2.0.11')
+    imgui.Text(u8('PAYDAY CENTER ' .. SCRIPT_VERSION))
     imgui.SetWindowFontScale(1.0)
     textMuted('Arizona RP - экономика, история, контроль Payday и Telegram')
     imgui.SetCursorPos(imgui.ImVec2(926, 10))
@@ -3533,11 +3686,12 @@ function main()
     sampRegisterChatCommand('paydebug', paydayDebugCommand)
     sampRegisterChatCommand('paywatch', paydayWatchCommand)
     sampRegisterChatCommand('payafk', paydayWatchCommand) -- старый псевдоним beta-версии
+    sampRegisterChatCommand('paymini', paydayMiniCommand)
     sampRegisterChatCommand('payupdate', updater.command)
 
-    print('[Arizona Payday Clean 2.0.11] Main commands: /payday /paytg /paytgtest /payupdate')
+    print('[Arizona Payday Clean ' .. SCRIPT_VERSION .. '] Main commands: /payday /paytg /paytgtest /paymini /payupdate')
 
-    sampAddChatMessage('{FFD34E}[PayDay 2.0.11] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Настройки сохранены.', -1)
+    sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Настройки сохранены.', -1)
 
     -- Telegram сохраняет меню команд на своей стороне. На каждом запуске
     -- повторно регистрировать его не нужно: это задерживало первые сообщения.
@@ -3549,7 +3703,7 @@ function main()
 
         -- Явно разводим режимы курсора: мини-окно скрывает его только
         -- когда главное окно действительно закрыто.
-        miniFrame.HideCursor = not window[0]
+        miniFrame.HideCursor = not miniMoveMode
         mainFrame.HideCursor = false
 
         processTelegramTransport()
@@ -3569,7 +3723,14 @@ function main()
             inicfg.save(ini, CONFIG)
         end
 
-        if window[0] and isKeyJustPressed(0x1B) then
+        if miniPositionDirty and not miniMoveMode then
+            saveMiniPosition()
+        end
+
+        if miniMoveMode and isKeyJustPressed(0x1B) then
+            setMiniMoveMode(false)
+            wait(150)
+        elseif window[0] and isKeyJustPressed(0x1B) then
             setMenuState(false)
             wait(150)
         end
@@ -3584,6 +3745,12 @@ function onScriptTerminate(script, quitGame)
             ini.afk.enabled = afkEnabled[0]
             ini.afk.telegram_alerts = afkTelegramAlerts[0]
             ini.telegram.commands_enabled = telegramCommandsEnabled[0]
+            if miniPositionInitialized then
+                miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
+                ini.ui.mini_x = math.floor(miniPosX + 0.5)
+                ini.ui.mini_y = math.floor(miniPosY + 0.5)
+            end
+            ini.ui.mini = miniEnabled[0]
             updater.saveSettings()
             inicfg.save(ini, CONFIG)
         end)

@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.11-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.12-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.11-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.12-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.11 |
+| **Version** | 2.0.12 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -120,6 +120,7 @@ That is how **Arizona Payday Clean** appeared.
 - optional deposit inclusion;
 - repaid and remaining amounts;
 - Payday and time forecasts;
+- movable in-game mini window with a saved position;
 - confirmation before progress reset.
 
 </td>
@@ -152,7 +153,19 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 2.0.11
+## 🆕 What Is New in Version 2.0.12
+
+- fixed the floating mini window: it can now be moved instead of being locked to one position;
+- added a dedicated move mode with a visible cursor and a **Done** button;
+- the mini-window position is saved in the INI file and restored after restart;
+- the saved position is clamped to the screen after a resolution change;
+- in passive mode, the mini window no longer intercepts mouse and keyboard input;
+- added `/paymini`, `/paymini reset`, `/paymini on`, and `/paymini off`;
+- fixed the fallback ticket-balance calculation that previously could not be reached;
+- strengthened duplicate protection across chat, GameText, TextDraw, and dialogs;
+- interface labels and version messages now use the actual `SCRIPT_VERSION` value.
+
+## Included in Version 2.0.11
 
 - completely reworked the **`Ticket: +N AZ Coins`** item parser;
 - supports the real server message `Вам был добавлен предмет Талон: +1 AZ Coins (3 шт.)`;
@@ -245,7 +258,7 @@ After Payday, the script sends a formatted report:
 ### Clean Installation
 
 1. Open the [latest Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest).
-2. Download `ArizonaPaydayClean.lua` or the versioned file.
+2. Download the single `ArizonaPaydayClean.lua` file.
 3. Keep only **one** script version in `moonloader`.
 4. Place the file in:
 
@@ -283,6 +296,9 @@ Telegram settings, statistics, and payback progress are preserved.
 | `/payhistory` | Show recent Payday records in game chat |
 | `/paywatch` | Enable or disable missed-Payday monitoring |
 | `/paydebug` | Enable or disable the diagnostic log |
+| `/paymini` | Enable or disable mini-window move mode |
+| `/paymini reset` | Reset the mini window to its default position |
+| `/payupdate` | Check whether a newer release is available |
 | `/paytg TOKEN CHAT_ID` | Save the Telegram token and chat ID, then enable notifications |
 | `/paytgtest` | Send a complete Telegram preview |
 | `/paytgon` | Enable Telegram notifications |
@@ -646,15 +662,3 @@ And special thanks to everyone whose path once crossed mine in SA:MP. Even if we
 **Artty**
 
 </div>
-
-
-## 🆕 What is new in version 2.0.11
-
-- fixed the main AZ ticket detection bug: `string.lower()` does not lowercase CP1251 Cyrillic, so `Талон` was missed;
-- added an exact parser for `Вам был добавлен предмет Талон: +1 AZ Coins (3 шт.)`;
-- ticket notifications are captured from server chat, GameText, TextDraw, and dialogs;
-- added cross-event duplicate protection;
-- added support for six- and eight-digit color tags;
-- a successful ticket count is confirmed immediately in the in-game chat;
-- the ZIP is clean and contains only `ArizonaPaydayClean.lua`.
-

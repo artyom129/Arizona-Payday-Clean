@@ -5,7 +5,7 @@
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.11-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.12-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.11-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.12-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -37,7 +37,7 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 2.0.11 |
+| **Версия** | 2.0.12 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
 | **Основной файл** | `ArizonaPaydayClean.lua` |
@@ -121,6 +121,7 @@
 - опциональный учёт депозита;
 - возвращённая и оставшаяся сумма;
 - прогноз Payday и времени;
+- перемещаемое мини-окно с сохранением позиции;
 - безопасное подтверждение сброса прогресса.
 
 </td>
@@ -156,7 +157,19 @@
 
 ---
 
-## 🆕 Что нового в версии 2.0.11
+## 🆕 Что нового в версии 2.0.12
+
+- полностью исправлено плавающее мини-окно: оно больше не закрепляется принудительно в одной точке;
+- добавлен отдельный режим перемещения с курсором и кнопкой **«Готово»**;
+- позиция мини-окна сохраняется в `ArizonaPaydayClean.ini` и восстанавливается после перезапуска;
+- окно автоматически возвращается в видимую область после смены разрешения экрана;
+- в обычном режиме мини-окно не перехватывает мышь и не мешает управлению персонажем;
+- добавлена команда `/paymini` и параметры `reset`, `on`, `off`;
+- исправлен резервный подсчёт талонов по изменению баланса: раньше эта ветка кода не могла выполниться;
+- усилена защита от повторного учёта одного уведомления из чата, GameText и TextDraw;
+- номер версии в интерфейсе и сообщениях теперь берётся из `SCRIPT_VERSION`, без рассинхронизации.
+
+## Что вошло в версию 2.0.11
 
 - исправлена главная причина незачисления талонов: `string.lower()` не переводил кириллицу CP1251, поэтому строка с `Талон` не распознавалась;
 - добавлен точный разбор строки `Вам был добавлен предмет Талон: +1 AZ Coins (3 шт.)`;
@@ -164,7 +177,7 @@
 - добавлен общий антидубль между разными источниками уведомления;
 - добавлена поддержка 6- и 8-значных цветовых тегов;
 - при успешном учёте талона скрипт сразу пишет подтверждение в игровой чат;
-- ZIP теперь чистый: внутри только `ArizonaPaydayClean.lua`.
+
 ## Что вошло в версию 2.0.1
 
 - добавлены двусторонние команды Telegram-бота через `getUpdates`;
@@ -247,7 +260,7 @@
 ### Чистая установка
 
 1. Открой [последний Release](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest).
-2. Скачай `ArizonaPaydayClean.lua` или версионный файл.
+2. Скачай единственный файл `ArizonaPaydayClean.lua`.
 3. В папке `moonloader` оставь только **одну** версию скрипта.
 4. Помести файл в папку:
 
@@ -285,6 +298,9 @@ moonloader/config/ArizonaPaydayClean_v1_backup.ini
 | `/payhistory` | Показать последние Payday в игровом чате |
 | `/paywatch` | Включить или выключить контроль пропущенного Payday |
 | `/paydebug` | Включить или выключить диагностический лог |
+| `/paymini` | Включить режим перемещения мини-окна; повторная команда сохраняет позицию |
+| `/paymini reset` | Вернуть мини-окно в стандартную позицию |
+| `/payupdate` | Проверить наличие новой версии и установить обновление |
 | `/paytg TOKEN CHAT_ID` | Сохранить Telegram token и chat ID, затем включить уведомления |
 | `/paytgtest` | Отправить полноценный тестовый предпросмотр |
 | `/paytgon` | Включить Telegram-уведомления |
