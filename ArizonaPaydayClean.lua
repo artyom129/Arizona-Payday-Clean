@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.1'
+local SCRIPT_VERSION = '2.0.11'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -44,7 +44,9 @@ local ini = inicfg.load({
         total_deposit = 0,
         total_az = 0,
         total_tickets = 0,
-        last_payday = 'Нет данных'
+        last_payday = 'Нет данных',
+        last_salary_received = true,
+        last_payday_partial = false
     },
     rank = {
         number = 1,
@@ -66,7 +68,7 @@ local ini = inicfg.load({
         chat_id = '',
         commands_enabled = true,
         update_offset = 0,
-        poll_interval = 1
+        poll_interval = 2
     },
     app = {
         schema = 2,
@@ -79,6 +81,19 @@ local ini = inicfg.load({
         interval_minutes = 30,
         grace_minutes = 8,
         telegram_alerts = true
+    },
+    update = {
+        auto_check = true,
+        auto_download = true,
+        auto_install = false,
+        check_interval_hours = 6,
+        last_check = 0,
+        latest_version = SCRIPT_VERSION,
+        pending_version = '',
+        pending_digest = '',
+        pending_size = 0,
+        pending_asset = '',
+        last_error = ''
     }
 }, CONFIG)
 
@@ -91,6 +106,7 @@ ini.ui = ini.ui or {}
 ini.telegram = ini.telegram or {}
 ini.app = ini.app or {}
 ini.afk = ini.afk or {}
+ini.update = ini.update or {}
 
 local function setDefault(section, key, value)
     if section[key] == nil then
@@ -113,6 +129,8 @@ setDefault(ini.stats, 'total_deposit', 0)
 setDefault(ini.stats, 'total_az', 0)
 setDefault(ini.stats, 'total_tickets', 0)
 setDefault(ini.stats, 'last_payday', 'Нет данных')
+setDefault(ini.stats, 'last_salary_received', true)
+setDefault(ini.stats, 'last_payday_partial', false)
 
 setDefault(ini.rank, 'number', 1)
 setDefault(ini.rank, 'cost', 0)
@@ -130,7 +148,7 @@ setDefault(ini.telegram, 'token', '')
 setDefault(ini.telegram, 'chat_id', '')
 setDefault(ini.telegram, 'commands_enabled', true)
 setDefault(ini.telegram, 'update_offset', 0)
-setDefault(ini.telegram, 'poll_interval', 1)
+setDefault(ini.telegram, 'poll_interval', 2)
 setDefault(ini.app, 'schema', 2)
 setDefault(ini.app, 'backup_done', false)
 setDefault(ini.app, 'debug', false)
@@ -139,16 +157,35 @@ setDefault(ini.afk, 'enabled', false)
 setDefault(ini.afk, 'interval_minutes', 30)
 setDefault(ini.afk, 'grace_minutes', 8)
 setDefault(ini.afk, 'telegram_alerts', true)
+setDefault(ini.update, 'auto_check', true)
+setDefault(ini.update, 'auto_download', true)
+setDefault(ini.update, 'auto_install', false)
+setDefault(ini.update, 'check_interval_hours', 6)
+setDefault(ini.update, 'last_check', 0)
+setDefault(ini.update, 'latest_version', SCRIPT_VERSION)
+setDefault(ini.update, 'pending_version', '')
+setDefault(ini.update, 'pending_digest', '')
+setDefault(ini.update, 'pending_size', 0)
+setDefault(ini.update, 'pending_asset', '')
+setDefault(ini.update, 'last_error', '')
 
 ini.stats.ticket_balance = tonumber(ini.stats.ticket_balance) or 0
 ini.stats.ticket_plus = tonumber(ini.stats.ticket_plus) or 0
 ini.stats.total_tickets = tonumber(ini.stats.total_tickets) or 0
+ini.stats.last_salary_received = ini.stats.last_salary_received == true
+    or ini.stats.last_salary_received == 1
+    or ini.stats.last_salary_received == '1'
+    or ini.stats.last_salary_received == 'true'
+ini.stats.last_payday_partial = ini.stats.last_payday_partial == true
+    or ini.stats.last_payday_partial == 1
+    or ini.stats.last_payday_partial == '1'
+    or ini.stats.last_payday_partial == 'true'
 ini.telegram.commands_enabled = ini.telegram.commands_enabled == true
     or ini.telegram.commands_enabled == 1
     or ini.telegram.commands_enabled == '1'
     or ini.telegram.commands_enabled == 'true'
 ini.telegram.update_offset = math.max(0, math.floor(tonumber(ini.telegram.update_offset) or 0))
-ini.telegram.poll_interval = math.min(10, math.max(1, tonumber(ini.telegram.poll_interval) or 1))
+ini.telegram.poll_interval = math.min(10, math.max(2, tonumber(ini.telegram.poll_interval) or 2))
 ini.app.schema = tonumber(ini.app.schema) or 2
 ini.app.debug = ini.app.debug == true or ini.app.debug == 1 or ini.app.debug == '1' or ini.app.debug == 'true'
 ini.app.history_limit = math.min(500, math.max(10, tonumber(ini.app.history_limit) or 50))
@@ -159,6 +196,26 @@ ini.afk.telegram_alerts = ini.afk.telegram_alerts == true
     or ini.afk.telegram_alerts == 1
     or ini.afk.telegram_alerts == '1'
     or ini.afk.telegram_alerts == 'true'
+ini.update.auto_check = ini.update.auto_check == true
+    or ini.update.auto_check == 1
+    or ini.update.auto_check == '1'
+    or ini.update.auto_check == 'true'
+ini.update.auto_download = ini.update.auto_download == true
+    or ini.update.auto_download == 1
+    or ini.update.auto_download == '1'
+    or ini.update.auto_download == 'true'
+ini.update.auto_install = ini.update.auto_install == true
+    or ini.update.auto_install == 1
+    or ini.update.auto_install == '1'
+    or ini.update.auto_install == 'true'
+ini.update.check_interval_hours = math.min(168, math.max(1, tonumber(ini.update.check_interval_hours) or 6))
+ini.update.last_check = math.max(0, tonumber(ini.update.last_check) or 0)
+ini.update.latest_version = tostring(ini.update.latest_version or SCRIPT_VERSION)
+ini.update.pending_version = tostring(ini.update.pending_version or '')
+ini.update.pending_digest = tostring(ini.update.pending_digest or '')
+ini.update.pending_size = math.max(0, tonumber(ini.update.pending_size) or 0)
+ini.update.pending_asset = tostring(ini.update.pending_asset or '')
+ini.update.last_error = tostring(ini.update.last_error or '')
 
 if not doesDirectoryExist(CONFIG_DIR) then
     createDirectory(CONFIG_DIR)
@@ -225,7 +282,7 @@ local session = {
 }
 
 local historyCache = {}
-local lastServerActivity = os.time()
+local lastServerActivity = 0
 local afkAlertSent = false
 local lastWatchdogCheck = 0
 local statsResetConfirmUntil = 0
@@ -252,6 +309,19 @@ local lastPaydayCatch = 0
 local paydaySequence = 0
 local paydayPending = false
 local paydayCaptureStartedAt = 0
+local paydayCaptureUpdatedAt = 0
+local paydayFinalizeAt = 0
+local paydaySignals = {
+    bank = false,
+    deposit = false,
+    az = false,
+    salary = false,
+    marker = false
+}
+local recentTicketGain = 0
+local recentTicketAt = 0
+local lastTicketKey = ''
+local lastTicketAtMs = 0
 
 local W = imgui.WindowFlags or {}
 local function flags(...)
@@ -266,6 +336,8 @@ end
 local MAIN_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse)
 local PANEL_FLAGS = flags(W.NoScrollbar, W.NoScrollWithMouse)
 local MINI_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.AlwaysAutoResize)
+local INPUT_FLAGS = imgui.InputTextFlags or {}
+local TOKEN_INPUT_FLAGS = INPUT_FLAGS.Password or 0
 
 local function clampNumber(value, minValue, maxValue)
     value = tonumber(value) or 0
@@ -298,7 +370,11 @@ local function money(value)
 end
 
 local function stripColors(text)
-    return (text or ''):gsub('{%x%x%x%x%x%x}', '')
+    local value = tostring(text or '')
+    value = value:gsub('{%x%x%x%x%x%x%x%x}', '')
+    value = value:gsub('{%x%x%x%x%x%x}', '')
+    value = value:gsub('\160', ' ')
+    return value
 end
 
 local function cleanNumber(value)
@@ -389,6 +465,33 @@ local function durationFromSeconds(seconds)
     end
 
     return string.format('%d мин.', minutes)
+end
+
+local function elapsedAgoText(timestamp)
+    timestamp = tonumber(timestamp) or 0
+    if timestamp <= 0 then
+        return 'данных ещё нет'
+    end
+
+    local elapsed = math.max(0, os.time() - timestamp)
+
+    if elapsed < 5 then
+        return 'только что'
+    elseif elapsed < 60 then
+        return string.format('%d сек. назад', elapsed)
+    elseif elapsed < 3600 then
+        local minutes = math.floor(elapsed / 60)
+        local seconds = elapsed % 60
+        return string.format('%d мин. %d сек. назад', minutes, seconds)
+    elseif elapsed < 86400 then
+        local hours = math.floor(elapsed / 3600)
+        local minutes = math.floor((elapsed % 3600) / 60)
+        return string.format('%d ч. %d мин. назад', hours, minutes)
+    end
+
+    local days = math.floor(elapsed / 86400)
+    local hours = math.floor((elapsed % 86400) / 3600)
+    return string.format('%d д. %d ч. назад', days, hours)
 end
 
 local function sessionDurationText()
@@ -570,9 +673,12 @@ local function rankStats()
     local cost = tonumber(ini.rank.cost) or 0
     local baseSalary = tonumber(ini.rank.salary_x1) or 0
     local realSalary = tonumber(ini.stats.salary) or 0
+    local salaryReceived = asBool(ini.stats.last_salary_received)
     local deposit = asBool(ini.rank.use_deposit) and (tonumber(ini.stats.deposit_plus) or 0) or 0
 
-    local currentSalary = realSalary > 0 and realSalary or baseSalary
+    -- Для прогноза сохраняем старое безопасное поведение: если строка зарплаты
+    -- не пришла, используем x1. Фактически полученная зарплата при этом остаётся 0.
+    local currentSalary = salaryReceived and realSalary > 0 and realSalary or baseSalary
     local currentIncome = currentSalary + deposit
     local baseIncome = baseSalary + deposit
     local repaid = clampNumber(ini.rank.repaid, 0, cost > 0 and cost or nil)
@@ -602,6 +708,7 @@ local function rankStats()
         cost = cost,
         baseSalary = baseSalary,
         realSalary = realSalary,
+        salaryReceived = salaryReceived,
         deposit = deposit,
         currentSalary = currentSalary,
         currentIncome = currentIncome,
@@ -705,6 +812,11 @@ local function telegramMessage()
     local totalPayday = salary + depositPlus
     local rankNumberValue = tonumber(ini.rank.number) or 1
     local progressPercent = st.progress * 100
+    local salaryReceived = asBool(ini.stats.last_salary_received)
+    local paydayResult = salaryReceived and 'Начисление успешно'
+        or 'Payday учтён без строки зарплаты'
+    local salarySuffix = salaryReceived and '' or '  <i>(не распознана)</i>'
+    local bonusText = salaryReceived and multiplierText(st.multiplier) or 'не определён'
 
     local azText = '<b>' .. formatNumber(azBalance) .. '</b>'
     if azPlus > 0 then
@@ -719,12 +831,12 @@ local function telegramMessage()
     local lines = {
         '<DIAMOND> <b>ARIZONA PAYDAY</b>',
         '<LINE>',
-        '<DONE> <b>Начисление успешно</b>',
+        (salaryReceived and '<DONE>' or '<WARN>') .. ' <b>' .. paydayResult .. '</b>',
         '',
         '<MONEY> <b>ДОХОД</b>',
-        '<MID> Зарплата: <b>' .. money(salary) .. '</b>',
+        '<MID> Зарплата: <b>' .. money(salary) .. '</b>' .. salarySuffix,
         '<MID> Депозит: <b>' .. money(depositPlus) .. '</b>',
-        '<MID> Бонус: <b>' .. multiplierText(st.multiplier) .. '</b>',
+        '<MID> Бонус: <b>' .. bonusText .. '</b>',
         '<END> Итого: <b>' .. money(totalPayday) .. '</b>',
         '',
         '<BANK> <b>БАЛАНС</b>',
@@ -764,6 +876,7 @@ local telegramFinished = nil
 local telegramStartedAt = 0
 local telegramCurrent = nil
 local telegramRequestNumber = 0
+local telegramPollPauseUntil = 0
 
 local function telegramLog(message)
     print('[Arizona Payday Clean][Telegram] ' .. tostring(message or ''))
@@ -813,20 +926,11 @@ end
 
 
 local TELEGRAM_BOT_COMMANDS = {
-    { command = 'start', description = 'Открыть меню команд' },
-    { command = 'status', description = 'Состояние игры и Payday' },
-    { command = 'stats', description = 'Общая статистика' },
-    { command = 'today', description = 'Доход за сегодня' },
-    { command = 'rank', description = 'Окупаемость ранга' },
+    { command = 'start', description = 'Открыть меню' },
+    { command = 'status', description = 'Полный статус и статистика' },
     { command = 'history', description = 'Последние Payday' },
-    { command = 'watch', description = 'Статус контроля Payday' },
-    { command = 'watch_on', description = 'Включить контроль Payday' },
-    { command = 'watch_off', description = 'Выключить контроль Payday' },
-    { command = 'notify_on', description = 'Включить автоуведомления' },
-    { command = 'notify_off', description = 'Выключить автоуведомления' },
-    { command = 'test', description = 'Тестовый Payday-отчёт' },
-    { command = 'version', description = 'Версия скрипта' },
-    { command = 'help', description = 'Справка по командам' }
+    { command = 'settings', description = 'Состояние настроек' },
+    { command = 'help', description = 'Справка' }
 }
 
 local function jsonEscape(value)
@@ -1128,7 +1232,7 @@ local function processTelegramTransport()
         end
 
         finishTelegramRequest(success, description)
-    elseif telegramBusy and telegramStartedAt > 0 and os.time() - telegramStartedAt >= 40 then
+    elseif telegramBusy and telegramStartedAt > 0 and os.time() - telegramStartedAt >= 20 then
         local timedOutPath = telegramCurrent and telegramCurrent.responsePath
         if timedOutPath and doesFileExist(timedOutPath) then
             os.remove(timedOutPath)
@@ -1244,13 +1348,23 @@ local function sendTelegramMessage(message, showResult, options)
         return false
     end
 
-    table.insert(telegramQueue, {
+    local item = {
         method = 'sendMessage',
         message = message,
         chatId = options.chatId,
         requiresNotifications = requiresNotifications,
         showResult = showResult == true
-    })
+    }
+
+    -- Пока идёт исходящая отправка, не запускаем новый long polling.
+    -- Тест и ответы на команды ставятся вперед очереди, чтобы не ждать
+    -- фонового обновления меню бота или обычных уведомлений.
+    telegramPollPauseUntil = math.max(telegramPollPauseUntil, os.time() + 3)
+    if showResult == true or options.priority == true then
+        table.insert(telegramQueue, 1, item)
+    else
+        table.insert(telegramQueue, item)
+    end
 
     processTelegramTransport()
     return true
@@ -1262,6 +1376,16 @@ local function queueTelegramCommandRegistration(showResult)
             sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Сначала настрой Telegram.', -1)
         end
         return false
+    end
+
+    -- Не плодим одинаковые setMyCommands: они задерживали тестовые сообщения.
+    if telegramCurrent and telegramCurrent.method == 'setMyCommands' then
+        return true
+    end
+    for _, queued in ipairs(telegramQueue) do
+        if queued.method == 'setMyCommands' then
+            return true
+        end
     end
 
     if #telegramQueue >= 20 then
@@ -1309,23 +1433,22 @@ local function telegramBotHelpMessage()
     return '<DIAMOND> <b>ARIZONA PAYDAY BOT</b>'
         .. string.char(10) .. '<LINE>'
         .. string.char(10) .. string.char(10)
-        .. '/status — состояние игры и Payday'
-        .. string.char(10) .. '/stats — общая статистика'
-        .. string.char(10) .. '/today — доход за сегодня'
-        .. string.char(10) .. '/rank — окупаемость ранга'
+        .. '/status — полный статус и статистика'
         .. string.char(10) .. '/history 5 — последние Payday'
-        .. string.char(10) .. '/watch — статус контроля Payday'
-        .. string.char(10) .. '/watch_on и /watch_off — переключить контроль'
-        .. string.char(10) .. '/notify_on и /notify_off — автоотчёты'
-        .. string.char(10) .. '/test — тестовый Payday-отчёт'
-        .. string.char(10) .. '/version — версия скрипта'
+        .. string.char(10) .. '/settings — состояние уведомлений и контроля'
+        .. string.char(10) .. '/help — эта справка'
+        .. string.char(10) .. string.char(10)
+        .. '<i>Изменение настроек выполняется только внутри игры.</i>'
 end
 
 local function telegramBotStatusMessage()
     local paydayState = lastPaydayCatch > 0
-        and (durationFromSeconds(os.time() - lastPaydayCatch) .. ' назад')
+        and elapsedAgoText(lastPaydayCatch)
         or 'ещё не обнаружен'
-    local serverState = durationFromSeconds(os.time() - lastServerActivity) .. ' назад'
+    local serverState = elapsedAgoText(lastServerActivity)
+    local serverClock = lastServerActivity > 0
+        and os.date('%H:%M:%S', lastServerActivity)
+        or '—'
 
     return '<DONE> <b>СТАТУС СКРИПТА</b>'
         .. string.char(10) .. '<LINE>'
@@ -1333,7 +1456,8 @@ local function telegramBotStatusMessage()
         .. '<MID> Версия: <b>' .. SCRIPT_VERSION .. '</b>'
         .. string.char(10) .. '<MID> Сессия: <b>' .. sessionDurationText() .. '</b>'
         .. string.char(10) .. '<MID> Последний Payday: <b>' .. paydayState .. '</b>'
-        .. string.char(10) .. '<MID> Серверная активность: <b>' .. serverState .. '</b>'
+        .. string.char(10) .. '<MID> Последняя строка сервера: <b>' .. serverState .. '</b>'
+        .. string.char(10) .. '<MID> Время строки: <b>' .. serverClock .. '</b>'
         .. string.char(10) .. '<MID> Контроль Payday: <b>' .. (afkEnabled[0] and 'включён' or 'выключен') .. '</b>'
         .. string.char(10) .. '<END> Автоуведомления: <b>' .. (asBool(ini.telegram.enabled) and 'включены' or 'выключены') .. '</b>'
 end
@@ -1442,8 +1566,23 @@ local function telegramBotWatchMessage()
         .. string.char(10) .. '<END> Запас: <b>' .. tostring(ini.afk.grace_minutes) .. ' мин.</b>'
 end
 
+local function telegramBotSettingsMessage()
+    return '<TIME> <b>НАСТРОЙКИ</b>'
+        .. string.char(10) .. '<LINE>'
+        .. string.char(10) .. string.char(10)
+        .. '<MID> Автоуведомления: <b>' .. (asBool(ini.telegram.enabled) and 'включены' or 'выключены') .. '</b>'
+        .. string.char(10) .. '<MID> Команды бота: <b>' .. (telegramCommandsEnabled[0] and 'включены' or 'выключены') .. '</b>'
+        .. string.char(10) .. '<END> Контроль Payday: <b>' .. (afkEnabled[0] and 'включён' or 'выключен') .. '</b>'
+        .. string.char(10) .. string.char(10)
+        .. '<i>Для безопасности изменение настроек доступно только в игре.</i>'
+end
+
 local function telegramReply(chatId, message)
-    return sendTelegramMessage(message, false, { force = true, chatId = chatId })
+    return sendTelegramMessage(message, false, {
+        force = true,
+        chatId = chatId,
+        priority = true
+    })
 end
 
 local function handleTelegramBotCommand(chatId, text)
@@ -1462,36 +1601,19 @@ local function handleTelegramBotCommand(chatId, text)
         telegramReply(chatId, telegramBotTodayMessage())
     elseif command == 'rank' then
         telegramReply(chatId, telegramBotRankMessage())
-    elseif command == 'history' then
-        telegramReply(chatId, telegramBotHistoryMessage(argument:match('%d+')))
     elseif command == 'watch' then
         telegramReply(chatId, telegramBotWatchMessage())
-    elseif command == 'watch_on' then
-        afkEnabled[0] = true
-        ini.afk.enabled = true
-        afkAlertSent = false
-        inicfg.save(ini, CONFIG)
-        telegramReply(chatId, '<DONE> <b>Контроль Payday включён.</b>')
-    elseif command == 'watch_off' then
-        afkEnabled[0] = false
-        ini.afk.enabled = false
-        afkAlertSent = false
-        inicfg.save(ini, CONFIG)
-        telegramReply(chatId, '<WARN> <b>Контроль Payday выключен.</b>')
-    elseif command == 'notify_on' then
-        ini.telegram.enabled = true
-        inicfg.save(ini, CONFIG)
-        telegramReply(chatId, '<DONE> <b>Автоматические Payday-уведомления включены.</b>')
-    elseif command == 'notify_off' then
-        ini.telegram.enabled = false
-        telegramQueue = {}
-        inicfg.save(ini, CONFIG)
-        telegramReply(chatId, '<WARN> <b>Автоматические Payday-уведомления выключены.</b>')
-    elseif command == 'test' then
-        telegramReply(chatId, '<DIAMOND> <b>ТЕСТОВЫЙ ПРЕДПРОСМОТР</b>'
-            .. string.char(10) .. string.char(10) .. telegramMessage())
     elseif command == 'version' then
         telegramReply(chatId, '<DIAMOND> <b>Arizona Payday Clean ' .. SCRIPT_VERSION .. '</b>')
+    elseif command == 'history' then
+        telegramReply(chatId, telegramBotHistoryMessage(argument:match('%d+')))
+    elseif command == 'settings' then
+        telegramReply(chatId, telegramBotSettingsMessage())
+    elseif command == 'watch_on' or command == 'watch_off'
+        or command == 'notify_on' or command == 'notify_off'
+        or command == 'test' then
+        telegramReply(chatId, '<WARN> <b>Удалённое изменение настроек отключено.</b>'
+            .. string.char(10) .. 'Используй интерфейс или команды внутри игры.')
     else
         telegramReply(chatId, '<WARN> <b>Неизвестная команда.</b>'
             .. string.char(10) .. 'Используй /help')
@@ -1587,7 +1709,7 @@ local function processTelegramBotPolling()
             end
         end
     elseif telegramPollBusy and telegramPollStartedAt > 0
-        and os.time() - telegramPollStartedAt >= 35 then
+        and os.time() - telegramPollStartedAt >= 12 then
         telegramPollBusy = false
         telegramPollStartedAt = 0
         if telegramPollResponsePath and doesFileExist(telegramPollResponsePath) then os.remove(telegramPollResponsePath) end
@@ -1597,9 +1719,12 @@ local function processTelegramBotPolling()
     end
 
     if telegramPollBusy
+        or telegramBusy
+        or #telegramQueue > 0
         or not telegramCommandsEnabled[0]
         or not telegramCredentialsReady()
-        or os.time() < telegramNextPollAt then
+        or os.time() < telegramNextPollAt
+        or os.time() < telegramPollPauseUntil then
         return
     end
 
@@ -1613,7 +1738,7 @@ local function processTelegramBotPolling()
     local url = 'https://api.telegram.org/bot' .. safeTelegramValue(ini.telegram.token)
         .. '/getUpdates?offset=' .. tostring(offset)
         .. '&limit=' .. (telegramPollBootstrap and '1' or '20')
-        .. '&timeout=20&allowed_updates=%5B%22message%22%5D'
+        .. '&timeout=2&allowed_updates=%5B%22message%22%5D'
 
     telegramPollBusy = true
     telegramPollStartedAt = os.time()
@@ -1671,12 +1796,17 @@ end
 
 local function afkAlertMessage()
     local minutes = math.floor(math.max(0, os.time() - lastPaydayCatch) / 60)
+    local serverState = elapsedAgoText(lastServerActivity)
+    local serverClock = lastServerActivity > 0
+        and os.date('%H:%M:%S', lastServerActivity)
+        or '—'
+
     return '<WARN> <b>КОНТРОЛЬ PAYDAY</b>'
         .. string.char(10) .. '<LINE>'
         .. string.char(10) .. string.char(10)
         .. 'Payday не обнаружен уже <b>' .. tostring(minutes) .. ' мин.</b>'
-        .. string.char(10) .. 'Последняя активность сервера: <b>'
-        .. os.date('%H:%M:%S', lastServerActivity) .. '</b>'
+        .. string.char(10) .. 'Последняя строка сервера: <b>' .. serverState .. '</b>'
+        .. string.char(10) .. 'Время строки: <b>' .. serverClock .. '</b>'
         .. string.char(10) .. string.char(10)
         .. '<i>Проверь подключение, персонажа и anti-AFK.</i>'
 end
@@ -1700,20 +1830,45 @@ local function processAfkWatchdog()
     end
 end
 
+local function clearPaydaySignals()
+    paydaySignals.bank = false
+    paydaySignals.deposit = false
+    paydaySignals.az = false
+    paydaySignals.salary = false
+    paydaySignals.marker = false
+end
+
+local function paydaySignalCount()
+    local count = 0
+    if paydaySignals.bank then count = count + 1 end
+    if paydaySignals.deposit then count = count + 1 end
+    if paydaySignals.az then count = count + 1 end
+    if paydaySignals.salary then count = count + 1 end
+    return count
+end
+
+local function paydayHasEnoughEvidence()
+    if paydaySignals.salary or paydaySignals.marker then
+        return true
+    end
+
+    if paydaySignalCount() >= 2 then
+        return true
+    end
+
+    -- Даже если часть банковского чека потерялась, положительное начисление
+    -- в одной из строк является достаточным признаком настоящего Payday.
+    return (tonumber(ini.stats.bank_plus) or 0) > 0
+        or (tonumber(ini.stats.deposit_plus) or 0) > 0
+        or (tonumber(ini.stats.az_plus) or 0) > 0
+end
+
 local function schedulePaydayFinalize()
     paydaySequence = paydaySequence + 1
-    local mySequence = paydaySequence
-
-    lua_thread.create(function()
-        wait(2300)
-        if mySequence ~= paydaySequence or not paydayPending then
-            return
-        end
-
-        paydayPending = false
-        paydayCaptureStartedAt = 0
-        markPayday()
-    end)
+    paydayCaptureUpdatedAt = os.time()
+    -- Старые 2.3 секунды иногда обрезали поздние строки. Семь секунд дают
+    -- банковскому чеку, AZ и талонам успеть прийти, не блокируя игровой поток.
+    paydayFinalizeAt = paydayCaptureUpdatedAt + 7
 end
 
 local function telegramCommand(arg)
@@ -1756,7 +1911,7 @@ local function telegramTestCommand()
         .. string.char(10) .. string.char(10)
         .. telegramMessage()
 
-    sendTelegramMessage(preview, true)
+    sendTelegramMessage(preview, true, { priority = true })
 end
 
 local function telegramEnableCommand()
@@ -1799,32 +1954,254 @@ local function telegramRegisterCommandsCommand()
     queueTelegramCommandRegistration(true)
 end
 
-local function beginPaydayCapture()
+local function beginPaydayCapture(signal)
+    local now = os.time()
+
     if not paydayPending then
         ini.stats.bank_plus = 0
         ini.stats.deposit_plus = 0
         ini.stats.salary = 0
         ini.stats.az_plus = 0
         ini.stats.ticket_plus = 0
+
+        clearPaydaySignals()
+        paydayPending = true
+        paydayCaptureStartedAt = now
+
+        -- Талон иногда приходит немного раньше банковского чека.
+        if recentTicketGain > 0 and now - recentTicketAt <= 12 then
+            ini.stats.ticket_plus = recentTicketGain
+            recentTicketGain = 0
+            recentTicketAt = 0
+        end
     end
 
-    paydayPending = true
-    paydayCaptureStartedAt = os.time()
+    if signal and paydaySignals[signal] ~= nil then
+        paydaySignals[signal] = true
+    end
+
+    schedulePaydayFinalize()
+end
+
+local function resetPaydayCapture(reason)
+    paydayPending = false
+    paydayCaptureStartedAt = 0
+    paydayCaptureUpdatedAt = 0
+    paydayFinalizeAt = 0
+    paydaySequence = paydaySequence + 1
+    clearPaydaySignals()
+
+    if reason then
+        debugLog('PAYDAY CAPTURE RESET: ' .. tostring(reason))
+    end
+end
+
+local function updateLastHistoryTickets(delta, balance)
+    delta = math.max(0, tonumber(delta) or 0)
+    if delta <= 0 or not doesFileExist(HISTORY_FILE) then return false end
+
+    local file = io.open(HISTORY_FILE, 'rb')
+    if not file then return false end
+
+    local lines = {}
+    for line in file:lines() do table.insert(lines, line) end
+    file:close()
+
+    for index = #lines, 2, -1 do
+        local parts = historyParts(lines[index])
+        if parts[1] == tostring(ini.stats.last_payday or '') and parts[12] ~= nil then
+            parts[5] = tostring((tonumber(parts[5]) or 0) + delta)
+            parts[9] = tostring(tonumber(balance) or tonumber(parts[9]) or 0)
+            lines[index] = table.concat(parts, ';')
+
+            local output = io.open(HISTORY_FILE, 'wb')
+            if not output then return false end
+            output:write(table.concat(lines, '\r\n'), '\r\n')
+            output:close()
+            refreshHistoryCache()
+            return true
+        end
+    end
+
+    return false
+end
+
+local function parseTicketAmounts(text, nums)
+    local source = stripColors(text)
+
+    -- Основной формат Arizona RP:
+    -- "Вам был добавлен предмет Талон: +1 AZ Coins (3 шт.)"
+    local exactPlus, exactBalance = source:match(
+        '[Тт][Аа][Лл][Оо][Нн]%s*:%s*%+%s*(%d+)%s*[Aa][Zz]%s*[Cc][Oo][Ii][Nn][Ss]?%s*%(%s*(%d+)%s*[Шш][Тт]%.?%s*%)'
+    )
+
+    local plusRaw = exactPlus
+        or source:match('%+%s*(%d+)')
+        or source:match('[Тт][Аа][Лл][Оо][Нн]%s*:%s*[%+xX]?%s*(%d+)')
+        or source:match('(%d+)%s*[Aa][Zz]%s*[Cc][Oo][Ii][Nn][Ss]?')
+
+    local balanceRaw = exactBalance
+        or source:match('%(%s*(%d+)%s*[Шш][Тт]%.?%s*%)')
+        or source:match('[Вв][Сс][Ее][Гг][Оо][^%d]*(%d+)')
+        or source:match('[Бб][Аа][Лл][Аа][Нн][Сс][^%d]*(%d+)')
+
+    local plus = plusRaw and cleanNumber(plusRaw) or 0
+    local balance = balanceRaw and cleanNumber(balanceRaw) or 0
+
+    if plus <= 0 and nums and #nums > 0 then
+        plus = tonumber(nums[1]) or 0
+    end
+    if balance <= 0 and nums and #nums > 1 then
+        balance = tonumber(nums[#nums]) or 0
+    end
+
+    return math.max(0, plus), math.max(0, balance)
+end
+
+local function isTicketNotification(text)
+    local source = stripColors(text)
+    local asciiLower = source:lower()
+
+    -- string.lower не переводит кириллицу CP1251 в нижний регистр.
+    -- Поэтому проверяем варианты "Талон" явно.
+    local hasTicketWord = hasText(source, 'Талон')
+        or hasText(source, 'талон')
+        or hasText(source, 'ТАЛОН')
+
+    local hasAzWord = asciiLower:find('az', 1, true) ~= nil
+        and (asciiLower:find('coin', 1, true) ~= nil
+            or asciiLower:find('coins', 1, true) ~= nil)
+
+    local hasGainMarker = source:find('+', 1, true) ~= nil
+        or hasText(source, 'добавлен')
+        or hasText(source, 'Добавлен')
+        or hasText(source, 'ДОБАВЛЕН')
+        or hasText(source, 'получен')
+        or hasText(source, 'Получен')
+        or hasText(source, 'выдан')
+        or hasText(source, 'Выдан')
+
+    return hasTicketWord and hasAzWord and hasGainMarker
+end
+
+local function processTicketLine(text, nums, sourceName)
+    local now = os.time()
+    local nowMs = getGameTimer()
+    local cleanText = stripColors(text):gsub('%s+', ' ')
+    local plus, balance = parseTicketAmounts(cleanText, nums)
+
+    if plus <= 0 then
+        debugLog('TICKET PARSE FAILED [' .. tostring(sourceName or 'unknown') .. ']: ' .. cleanText)
+        return false
+    end
+
+    -- Одна и та же серверная подсказка может одновременно попасть в чат,
+    -- GameText и TextDraw. Блокируем только этот короткий межсобытийный дубль.
+    local duplicateKey = tostring(plus) .. ':' .. tostring(balance)
+    local duplicateElapsed = nowMs - lastTicketAtMs
+    if duplicateKey == lastTicketKey
+        and duplicateElapsed >= 0 and duplicateElapsed <= 650 then
+        debugLog('TICKET CROSS-EVENT DUPLICATE SKIPPED ['
+            .. tostring(sourceName or 'unknown') .. ']: ' .. cleanText)
+        return false
+    end
+
+    lastTicketKey = duplicateKey
+    lastTicketAtMs = nowMs
+
+    local previousBalance = tonumber(ini.stats.ticket_balance) or 0
+
+    if plus <= 0 and balance > previousBalance then
+        plus = balance - previousBalance
+    end
+    if balance <= 0 and plus > 0 then
+        balance = previousBalance + plus
+    end
+
+    if balance > 0 then
+        ini.stats.ticket_balance = balance
+    end
+
+    ini.stats.total_tickets = (tonumber(ini.stats.total_tickets) or 0) + plus
+    session.tickets = session.tickets + plus
+
+    if paydayPending then
+        ini.stats.ticket_plus = (tonumber(ini.stats.ticket_plus) or 0) + plus
+        schedulePaydayFinalize()
+    elseif lastPaydayCatch > 0 and now - lastPaydayCatch <= 12 then
+        ini.stats.ticket_plus = (tonumber(ini.stats.ticket_plus) or 0) + plus
+        updateLastHistoryTickets(plus, ini.stats.ticket_balance)
+    else
+        ini.stats.ticket_plus = plus
+        if recentTicketGain > 0 and now - recentTicketAt > 12 then
+            recentTicketGain = 0
+        end
+        recentTicketGain = recentTicketGain + plus
+        recentTicketAt = now
+    end
+
+    inicfg.save(ini, CONFIG)
+    statusText = 'Получено талонов AZ: +' .. tostring(plus)
+    sampAddChatMessage('{55DD88}[PayDay] {FFFFFF}Талон AZ учтен: +' .. tostring(plus)
+        .. ' | Всего: ' .. tostring(ini.stats.total_tickets), -1)
+    debugLog('TICKET COUNTED [' .. tostring(sourceName or 'unknown') .. ']:'
+        .. ' plus=' .. tostring(plus)
+        .. ' balance=' .. tostring(ini.stats.ticket_balance)
+        .. ' total=' .. tostring(ini.stats.total_tickets)
+        .. ' source=' .. cleanText)
+    return true
+end
+
+local function tryProcessTicketText(text, sourceName)
+    local cleanText = stripColors(text)
+    if cleanText == '' or not isTicketNotification(cleanText) then
+        return false
+    end
+
+    local ok, result = pcall(processTicketLine, cleanText, extractNumbers(cleanText), sourceName)
+    if not ok then
+        debugLog('TICKET HANDLER ERROR [' .. tostring(sourceName or 'unknown') .. ']: '
+            .. tostring(result) .. ' | ' .. cleanText)
+        return false
+    end
+    return result == true
 end
 
 local function processPaydayCaptureTimeout()
-    if paydayPending and paydayCaptureStartedAt > 0
-        and os.time() - paydayCaptureStartedAt >= 15 then
+    if not paydayPending or paydayCaptureStartedAt <= 0 then
+        return
+    end
+
+    local now = os.time()
+
+    if paydayFinalizeAt > 0 and now >= paydayFinalizeAt and paydayHasEnoughEvidence() then
         paydayPending = false
         paydayCaptureStartedAt = 0
-        paydaySequence = paydaySequence + 1
-        debugLog('PAYDAY CAPTURE RESET: timeout before salary finalization')
+        paydayCaptureUpdatedAt = 0
+        paydayFinalizeAt = 0
+        markPayday()
+        clearPaydaySignals()
+        return
+    end
+
+    if now - paydayCaptureStartedAt >= 25 then
+        if paydayHasEnoughEvidence() then
+            paydayPending = false
+            paydayCaptureStartedAt = 0
+            paydayCaptureUpdatedAt = 0
+            paydayFinalizeAt = 0
+            markPayday()
+            clearPaydaySignals()
+        else
+            resetPaydayCapture('not enough evidence after 25 seconds')
+        end
     end
 end
 
 markPayday = function()
     local now = os.time()
     if now - lastPaydayCatch < 10 then
+        debugLog('PAYDAY DUPLICATE SKIPPED')
         return
     end
     lastPaydayCatch = now
@@ -1834,19 +2211,20 @@ markPayday = function()
     local deposit = tonumber(ini.stats.deposit_plus) or 0
     local az = tonumber(ini.stats.az_plus) or 0
     local tickets = tonumber(ini.stats.ticket_plus) or 0
+    local salaryReceived = paydaySignals.salary == true
 
+    ini.stats.last_salary_received = salaryReceived
+    ini.stats.last_payday_partial = not salaryReceived
     ini.stats.paydays = (tonumber(ini.stats.paydays) or 0) + 1
     ini.stats.total_salary = (tonumber(ini.stats.total_salary) or 0) + salary
     ini.stats.total_deposit = (tonumber(ini.stats.total_deposit) or 0) + deposit
     ini.stats.total_az = (tonumber(ini.stats.total_az) or 0) + az
-    ini.stats.total_tickets = (tonumber(ini.stats.total_tickets) or 0) + tickets
     ini.stats.last_payday = os.date('%d.%m.%Y %H:%M:%S')
 
     session.paydays = session.paydays + 1
     session.salary = session.salary + salary
     session.deposit = session.deposit + deposit
     session.az = session.az + az
-    session.tickets = session.tickets + tickets
 
     if asBool(ini.rank.tracking) and not asBool(ini.rank.completed) then
         local incomeForRank = salary
@@ -1864,11 +2242,15 @@ markPayday = function()
             ini.rank.tracking = false
             statusText = 'Ранг окуплен'
             sampAddChatMessage('{55DD88}[PayDay Helper] {FFFFFF}Ранг окуплен. Красавчик.', -1)
-        else
+        elseif salaryReceived then
             statusText = 'PayDay учтен в окупаемости'
+        else
+            statusText = 'PayDay учтен без строки зарплаты'
         end
-    else
+    elseif salaryReceived then
         statusText = 'PayDay учтен'
+    else
+        statusText = 'PayDay учтен без строки зарплаты'
     end
 
     inicfg.save(ini, CONFIG)
@@ -1885,14 +2267,20 @@ markPayday = function()
         azBalance = ini.stats.az_balance,
         ticketBalance = ini.stats.ticket_balance,
         rank = ini.rank.number,
-        multiplier = st.multiplier,
+        multiplier = salaryReceived and st.multiplier or 1,
         total = salary + deposit
     })
 
     debugLog('PAYDAY FINALIZED: salary=' .. tostring(salary)
+        .. ' salary_received=' .. tostring(salaryReceived)
         .. ' deposit=' .. tostring(deposit)
         .. ' az=' .. tostring(az)
-        .. ' tickets=' .. tostring(tickets))
+        .. ' tickets=' .. tostring(tickets)
+        .. ' signals=' .. tostring(paydaySignalCount()))
+
+    if not salaryReceived then
+        sampAddChatMessage('{FFB84D}[PayDay 2.0] {FFFFFF}Payday учтен, но строка зарплаты не пришла. Остальные данные сохранены.', -1)
+    end
 
     if telegramReady() then
         sendTelegramMessage(telegramMessage(), false)
@@ -1904,59 +2292,114 @@ function sampev.onServerMessage(color, text)
     lastServerActivity = os.time()
 
     local nums = extractNumbers(text)
+    local isPaydayMarker = hasText(text, 'Банковский чек')
+        or hasText(text, 'Начисление за PayDay')
+        or hasText(text, 'Начисление за Payday')
+
     local isBankLine = hasText(text, 'Текущая сумма в банке')
         or hasText(text, 'Сумма в банке')
         or hasText(text, 'Банковский счет')
+        or hasText(text, 'Банковский счёт')
+        or hasText(text, 'Сумма на банковском счете')
+        or hasText(text, 'Сумма на банковском счёте')
 
     local isDepositLine = hasText(text, 'Текущая сумма на депозите')
         or hasText(text, 'Сумма на депозите')
         or hasText(text, 'Депозитный счет')
+        or hasText(text, 'Депозитный счёт')
+        or hasText(text, 'Баланс депозита')
         or (paydayPending and hasText(text, 'депозите'))
 
     local isAzBalanceLine = hasText(text, 'Баланс на донат-счет')
         or hasText(text, 'Баланс на донат-счёт')
+        or hasText(text, 'Баланс на донат-счете')
+        or hasText(text, 'Баланс на донат-счёте')
         or hasText(text, 'Баланс донат-счета')
         or hasText(text, 'Баланс донат-счёта')
 
-    local isTicketLine = hasText(text, 'Талон:') and hasText(text, 'AZ Coins')
+    local isTicketLine = isTicketNotification(text)
+
     local isSalaryLine = hasText(text, 'Общая заработанная плата')
         or hasText(text, 'Общая заработная плата')
         or hasText(text, 'Зарплата организации')
+        or hasText(text, 'Начислена зарплата')
+        or hasText(text, 'Ваша зарплата')
 
-    if debugEnabled[0] and (paydayPending or isBankLine or isDepositLine or isAzBalanceLine or isTicketLine or isSalaryLine) then
+    if debugEnabled[0] and (paydayPending or isPaydayMarker or isBankLine
+        or isDepositLine or isAzBalanceLine or isTicketLine or isSalaryLine) then
         debugLog('SERVER: ' .. text)
     end
 
     if isTicketLine then
-        beginPaydayCapture()
-        if nums[1] ~= nil then ini.stats.ticket_plus = nums[1] end
-        if nums[2] ~= nil then ini.stats.ticket_balance = nums[2] end
+        tryProcessTicketText(text, 'server_message')
+    end
+
+    if isPaydayMarker then
+        beginPaydayCapture('marker')
+        statusText = 'Считываю Payday'
     end
 
     if isBankLine then
-        beginPaydayCapture()
+        beginPaydayCapture('bank')
         if nums[1] ~= nil then ini.stats.bank = nums[1] end
         if nums[2] ~= nil then ini.stats.bank_plus = nums[2] end
         statusText = 'Считываю банковский чек'
     end
 
     if isDepositLine then
-        beginPaydayCapture()
+        beginPaydayCapture('deposit')
         if nums[1] ~= nil then ini.stats.deposit = nums[1] end
         if nums[2] ~= nil then ini.stats.deposit_plus = nums[2] end
     end
 
     if isAzBalanceLine then
-        beginPaydayCapture()
+        beginPaydayCapture('az')
         if nums[1] ~= nil then ini.stats.az_balance = nums[1] end
         if nums[2] ~= nil then ini.stats.az_plus = nums[2] end
     end
 
-    if isSalaryLine and nums[1] ~= nil then
-        beginPaydayCapture()
-        ini.stats.salary = nums[1]
-        schedulePaydayFinalize()
+    if isSalaryLine then
+        beginPaydayCapture('salary')
+        if nums[1] ~= nil then
+            ini.stats.salary = nums[1]
+        else
+            ini.stats.salary = 0
+        end
     end
+end
+
+
+-- На некоторых сборках Arizona уведомление о предмете приходит не в чат,
+-- а через GameText/TextDraw. Эти обработчики используют тот же безопасный
+-- парсер и общий антидубль.
+function sampev.onDisplayGameText(style, time, text)
+    tryProcessTicketText(text, 'game_text')
+end
+
+function sampev.onShowTextDraw(id, data)
+    if type(data) == 'table' and data.text then
+        tryProcessTicketText(data.text, 'textdraw_show')
+    end
+end
+
+function sampev.onTextDrawSetString(id, text)
+    tryProcessTicketText(text, 'textdraw_update')
+end
+
+function sampev.onShowDialog(dialogId, style, title, button1, button2, dialogText)
+    tryProcessTicketText(title, 'dialog_title')
+    tryProcessTicketText(dialogText, 'dialog_text')
+end
+
+local function ticketParserSelfTest()
+    local sample = 'Вам был добавлен предмет Талон: +1 AZ Coins (3 шт.)'
+    local plus, balance = parseTicketAmounts(sample, extractNumbers(sample))
+    if plus ~= 1 or balance ~= 3 or not isTicketNotification(sample) then
+        print('[Arizona Payday Clean] WARNING: ticket parser self-test failed: '
+            .. tostring(plus) .. '/' .. tostring(balance))
+        return false
+    end
+    return true
 end
 
 local function paydayStatsCommand()
@@ -2011,21 +2454,15 @@ local function paydayWatchCommand()
 end
 
 local function setMenuState(state)
+    state = state == true
     if window[0] and not state then
         saveRankInputs()
     end
 
     window[0] = state
 
-    -- Передаем управление курсором интерфейсу, чтобы камера игры не дергала мышь.
-    pcall(function()
-        if state then
-            sampSetCursorMode(2)
-        else
-            sampSetCursorMode(0)
-        end
-    end)
-
+    -- Курсором управляет только mimgui через mainFrame.HideCursor=false.
+    -- Дополнительный sampSetCursorMode конфликтовал с ImGui и давал мигание.
     pcall(function()
         lockPlayerControl(state)
     end)
@@ -2139,6 +2576,8 @@ local function drawBankTab()
             ini.stats.total_az = 0
             ini.stats.total_tickets = 0
             ini.stats.last_payday = 'Нет данных'
+            ini.stats.last_salary_received = true
+            ini.stats.last_payday_partial = false
             statsResetConfirmUntil = 0
             inicfg.save(ini, CONFIG)
             statusText = 'Статистика сброшена'
@@ -2202,7 +2641,8 @@ local function drawRankTab()
     beginPanel('rank_now_panel', 260, 330, 700, 122)
     textMuted('ТЕКУЩИЙ РАСЧЕТ ЗАРПЛАТЫ')
     row('Обычная зарплата x1', money(st.baseSalary), 0, 430)
-    row('Получено за последний PayDay', money(st.currentSalary), 1, 430)
+    row('Получено за последний PayDay',
+        st.salaryReceived and money(st.realSalary) or 'строка не распознана', 1, 430)
     row('Определенный бонус', multiplierText(st.multiplier), 1, 430)
     row('Доход в окупаемость за PayDay', money(st.currentIncome), 2, 430)
     endPanel()
@@ -2382,7 +2822,7 @@ local function drawTelegramTab()
     textMuted('Bot token')
     imgui.SetCursorPos(imgui.ImVec2(18, 44))
     imgui.PushItemWidth(650)
-    imgui.InputText('##telegram_token', telegramTokenText, ffi.sizeof(telegramTokenText))
+    imgui.InputText('##telegram_token', telegramTokenText, ffi.sizeof(telegramTokenText), TOKEN_INPUT_FLAGS)
     imgui.PopItemWidth()
 
     imgui.SetCursorPos(imgui.ImVec2(18, 92))
@@ -2458,6 +2898,497 @@ local function drawTelegramTab()
     endPanel()
 end
 
+
+local updater = (function()
+    local M = {}
+    local bit = require 'bit'
+    local scriptPath = thisScript().path
+    local apiUrl = 'https://api.github.com/repos/artyom129/Arizona-Payday-Clean/releases/latest'
+    local apiFile = CONFIG_DIR .. '\\ArizonaPaydayClean_release.json'
+    local downloadFile = CONFIG_DIR .. '\\ArizonaPaydayClean.update.lua'
+    local replacementFile = CONFIG_DIR .. '\\ArizonaPaydayClean.installing.lua'
+    local backupFile = CONFIG_DIR .. '\\ArizonaPaydayClean.previous.lua'
+    local failedFile = CONFIG_DIR .. '\\ArizonaPaydayClean.failed.lua'
+    local repositoryPrefix = 'https://github.com/artyom129/Arizona-Payday-Clean/releases/download/'
+    -- Один понятный режим вместо трёх зависимых галочек.
+    -- Старые параметры INI сохраняются для обратной совместимости.
+    local autoUpdate = new.bool(asBool(ini.update.auto_install))
+    local statusText = 'Обновления ещё не проверялись'
+    local latestVersion = tostring(ini.update.latest_version or SCRIPT_VERSION)
+    local latestAsset = nil
+    local busy = false
+    local finished = nil
+    local startedAt = 0
+    local requestNumber = 0
+    local current = nil
+    local queued = nil
+    local afterCheck = nil
+    local installAfterDownload = false
+    local nextAutoCheckAt = os.time() + 8
+
+    local constants = {
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+        0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+        0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+        0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+        0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+        0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    }
+
+    local function add32(...)
+        local sum = 0
+        for index = 1, select('#', ...) do sum = sum + (select(index, ...) or 0) end
+        return bit.band(sum, 0xffffffff)
+    end
+
+    local function processBlock(state, block)
+        local words = {}
+        for index = 0, 15 do
+            local offset = index * 4 + 1
+            words[index] = bit.bor(
+                bit.lshift(block:byte(offset), 24),
+                bit.lshift(block:byte(offset + 1), 16),
+                bit.lshift(block:byte(offset + 2), 8),
+                block:byte(offset + 3)
+            )
+        end
+        for index = 16, 63 do
+            local v15, v2 = words[index - 15], words[index - 2]
+            local s0 = bit.bxor(bit.ror(v15, 7), bit.ror(v15, 18), bit.rshift(v15, 3))
+            local s1 = bit.bxor(bit.ror(v2, 17), bit.ror(v2, 19), bit.rshift(v2, 10))
+            words[index] = add32(words[index - 16], s0, words[index - 7], s1)
+        end
+        local a,b,c,d,e,f,g,h = state[1],state[2],state[3],state[4],state[5],state[6],state[7],state[8]
+        for index = 0, 63 do
+            local s1 = bit.bxor(bit.ror(e, 6), bit.ror(e, 11), bit.ror(e, 25))
+            local choice = bit.bxor(bit.band(e, f), bit.band(bit.bnot(e), g))
+            local t1 = add32(h, s1, choice, constants[index + 1], words[index])
+            local s0 = bit.bxor(bit.ror(a, 2), bit.ror(a, 13), bit.ror(a, 22))
+            local majority = bit.bxor(bit.band(a, b), bit.band(a, c), bit.band(b, c))
+            local t2 = add32(s0, majority)
+            h,g,f,e,d,c,b,a = g,f,e,add32(d,t1),c,b,a,add32(t1,t2)
+        end
+        state[1],state[2],state[3],state[4] = add32(state[1],a),add32(state[2],b),add32(state[3],c),add32(state[4],d)
+        state[5],state[6],state[7],state[8] = add32(state[5],e),add32(state[6],f),add32(state[7],g),add32(state[8],h)
+    end
+
+    local function pack32(value)
+        return string.char(
+            bit.band(bit.rshift(value,24),0xff), bit.band(bit.rshift(value,16),0xff),
+            bit.band(bit.rshift(value,8),0xff), bit.band(value,0xff)
+        )
+    end
+
+    local function sha256File(path)
+        local file = io.open(path, 'rb')
+        if not file then return nil, 'Не удалось открыть файл для SHA-256.' end
+        local state = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}
+        local buffer, totalBytes = '', 0
+        while true do
+            local chunk = file:read(65536)
+            if not chunk then break end
+            totalBytes = totalBytes + #chunk
+            buffer = buffer .. chunk
+            while #buffer >= 64 do processBlock(state, buffer:sub(1,64)); buffer = buffer:sub(65) end
+        end
+        file:close()
+        local totalBits = totalBytes * 8
+        local high, low = math.floor(totalBits / 4294967296), totalBits % 4294967296
+        local padding = (56 - ((#buffer + 1) % 64)) % 64
+        buffer = buffer .. string.char(0x80) .. string.rep(string.char(0), padding) .. pack32(high) .. pack32(low)
+        while #buffer >= 64 do processBlock(state, buffer:sub(1,64)); buffer = buffer:sub(65) end
+        local result = {}
+        for index=1,8 do result[index]=bit.tohex(state[index],8) end
+        return table.concat(result)
+    end
+
+    local function normalizeVersion(value)
+        return tostring(value or ''):gsub('^[vV]',''):match('^(%d+%.%d+%.%d+)')
+    end
+
+    local function isNewer(candidate,currentVersion)
+        local candidateNormalized = normalizeVersion(candidate)
+        local currentNormalized = normalizeVersion(currentVersion)
+        if not candidateNormalized or not currentNormalized then return false end
+        local ca,cb,cc = candidateNormalized:match('^(%d+)%.(%d+)%.(%d+)$')
+        local aa,ab,ac = currentNormalized:match('^(%d+)%.(%d+)%.(%d+)$')
+        ca,cb,cc,aa,ab,ac = tonumber(ca),tonumber(cb),tonumber(cc),tonumber(aa),tonumber(ab),tonumber(ac)
+        if ca ~= aa then return ca > aa end
+        if cb ~= ab then return cb > ab end
+        return cc > ac
+    end
+
+    local function log(message) print('[Arizona Payday Clean][Updater] ' .. tostring(message or '')) end
+    local function readFile(path)
+        local file=io.open(path,'rb'); if not file then return nil end
+        local data=file:read('*a') or ''; file:close(); return data
+    end
+    local function validDigest(value)
+        if type(value)~='string' then return nil end
+        local hash=value:match('^sha256:([0-9a-fA-F]+)$')
+        return hash and #hash==64 and hash:lower() or nil
+    end
+
+    local function verify(path, expectedVersion, expectedSize, expectedDigest)
+        if not doesFileExist(path) then return false,'Скачанный файл не найден.' end
+        local data=readFile(path); if not data then return false,'Не удалось прочитать скачанный файл.' end
+        if #data<20000 or #data>2097152 then return false,'Подозрительный размер Lua-файла.' end
+        expectedSize=tonumber(expectedSize) or 0
+        if expectedSize>0 and #data~=expectedSize then return false,'Размер файла не совпал с GitHub Release.' end
+        if data:find(string.char(0),1,true) then return false,'В Lua-файле обнаружены нулевые байты.' end
+        local declared=data:match("local%s+SCRIPT_VERSION%s*=%s*['\"]([^'\"]+)['\"]")
+        if normalizeVersion(declared)~=normalizeVersion(expectedVersion) then return false,'Версия внутри Lua-файла не совпадает с тегом.' end
+        if not data:find("script_name('Arizona Payday Clean')",1,true) or not data:find("script_author('Artty')",1,true) then
+            return false,'Файл не похож на официальный Arizona Payday Clean.'
+        end
+        local chunk,syntaxError=loadfile(path); if not chunk then return false,'Синтаксическая ошибка: '..tostring(syntaxError) end
+        chunk=nil
+        local digest=validDigest(expectedDigest); if not digest then return false,'GitHub не предоставил SHA-256 digest.' end
+        local actual,digestError=sha256File(path); if not actual then return false,digestError end
+        if actual:lower()~=digest then return false,'SHA-256 скачанного файла не совпал с GitHub.' end
+        return true
+    end
+
+    local function selectAsset(payload,version)
+        if type(payload)~='table' or type(payload.assets)~='table' then return nil,'В Release нет списка файлов.' end
+        local normalized=normalizeVersion(version); if not normalized then return nil,'Некорректный тег версии.' end
+        local preferred='ArizonaPaydayClean_v'..normalized:gsub('%.','_')..'_Artty.lua'
+        local best,bestScore=nil,-1
+        for _,asset in ipairs(payload.assets) do
+            if type(asset)=='table' then
+                local name,url,size=tostring(asset.name or ''),tostring(asset.browser_download_url or ''),tonumber(asset.size) or 0
+                local score=-1
+                if name=='ArizonaPaydayClean.lua' then score=100
+                elseif name==preferred then score=90
+                elseif name:match('^ArizonaPaydayClean.*%.lua$') and not name:lower():find('beta',1,true) then score=50 end
+                if score>bestScore and url:sub(1,#repositoryPrefix)==repositoryPrefix and size>=20000 and size<=2097152 and validDigest(asset.digest) then
+                    best={name=name,url=url,size=size,digest=tostring(asset.digest),version=normalized}; bestScore=score
+                end
+            end
+        end
+        return best, best and nil or 'В Release нет подходящего Lua-файла с SHA-256 digest.'
+    end
+
+    local function networkBusy() return telegramBusy or telegramPollBusy or #telegramQueue>0 end
+    local function queueCheck(showResult,nextAction)
+        if busy or queued then
+            statusText='Операция обновления уже выполняется'
+            if showResult then
+                sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Подожди завершения текущей операции.',-1)
+            end
+            return false
+        end
+        afterCheck=nextAction
+        queued={kind='check',showResult=showResult==true}
+        statusText='Ожидаю проверку GitHub...'
+        return true
+    end
+
+    local function queueDownload(showResult)
+        if busy or queued then
+            statusText='Операция обновления уже выполняется'
+            if showResult then
+                sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Подожди завершения текущей операции.',-1)
+            end
+            return false
+        end
+        if not latestAsset then return queueCheck(showResult,'install') end
+        queued={kind='download',showResult=showResult==true,asset=latestAsset}
+        statusText='Ожидаю загрузку обновления...'
+        return true
+    end
+    local function clearPending()
+        ini.update.pending_version=''; ini.update.pending_digest=''; ini.update.pending_size=0; ini.update.pending_asset=''
+        if doesFileExist(downloadFile) then os.remove(downloadFile) end; inicfg.save(ini,CONFIG)
+    end
+
+    local function replaceScript(sourcePath,backupPath)
+        if doesFileExist(replacementFile) then os.remove(replacementFile) end
+        if not copyFile(sourcePath,replacementFile) then return false,'Не удалось подготовить файл установки.' end
+        local chunk,syntaxError=loadfile(replacementFile)
+        if not chunk then os.remove(replacementFile); return false,'Проверка установки не пройдена: '..tostring(syntaxError) end
+        chunk=nil
+        if backupPath and doesFileExist(backupPath) then os.remove(backupPath) end
+        if backupPath and not copyFile(scriptPath,backupPath) then
+            os.remove(replacementFile)
+            return false,'Не удалось создать резервную копию.'
+        end
+        if backupPath then
+            local backupChunk,backupError=loadfile(backupPath)
+            if not backupChunk then
+                os.remove(replacementFile)
+                os.remove(backupPath)
+                return false,'Резервная копия не прошла проверку: '..tostring(backupError)
+            end
+            backupChunk=nil
+        end
+        if not os.remove(scriptPath) then
+            os.remove(replacementFile)
+            return false,'MoonLoader не разрешил заменить текущий Lua-файл.'
+        end
+        local renamed,renameError=os.rename(replacementFile,scriptPath)
+        if not renamed then
+            if backupPath and doesFileExist(backupPath) then copyFile(backupPath,scriptPath) end
+            os.remove(replacementFile)
+            return false,'Не удалось установить файл: '..tostring(renameError)
+        end
+        local installedChunk,installedError=loadfile(scriptPath)
+        if not installedChunk then
+            os.remove(scriptPath)
+            if backupPath and doesFileExist(backupPath) then copyFile(backupPath,scriptPath) end
+            return false,'Установленный файл не прошёл повторную проверку: '..tostring(installedError)
+        end
+        installedChunk=nil
+        return true
+    end
+
+    local function install(showResult)
+        local version=tostring(ini.update.pending_version or '')
+        if version=='' or not doesFileExist(downloadFile) then
+            statusText='Нет скачанного обновления'
+            if showResult then sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Сначала скачай обновление.',-1) end
+            return false
+        end
+        if not isNewer(version,SCRIPT_VERSION) then
+            clearPending()
+            statusText='Скачанный файл уже не новее установленной версии'
+            if showResult then sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Старый файл обновления удалён.',-1) end
+            return false
+        end
+        local ok,errorText=verify(downloadFile,version,ini.update.pending_size,ini.update.pending_digest)
+        if not ok then
+            ini.update.last_error=tostring(errorText); statusText='Проверка не пройдена'; clearPending()
+            if showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(errorText),-1) end
+            return false
+        end
+        local installed,installError=replaceScript(downloadFile,backupFile)
+        if not installed then
+            ini.update.last_error=tostring(installError); statusText='Установка не выполнена'; inicfg.save(ini,CONFIG)
+            if showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(installError),-1) end
+            return false
+        end
+        ini.update.pending_version=''; ini.update.pending_digest=''; ini.update.pending_size=0; ini.update.pending_asset=''
+        ini.update.latest_version=version; ini.update.last_error=''; inicfg.save(ini,CONFIG)
+        if doesFileExist(downloadFile) then os.remove(downloadFile) end
+        statusText='Установлена версия '..version..'. Перезагрузка...'
+        sampAddChatMessage('{55DD88}[PayDay Update] {FFFFFF}Версия '..version..' установлена. Перезагружаю скрипт.',-1)
+        lua_thread.create(function() wait(1200); local reloadOk,reloadError=pcall(function() thisScript():reload() end); if not reloadOk then log(reloadError) end end)
+        return true
+    end
+
+    local function rollback(showResult)
+        if not doesFileExist(backupFile) then
+            statusText='Резервная копия отсутствует'; if showResult then sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Предыдущая версия не найдена.',-1) end; return false
+        end
+        local chunk,syntaxError=loadfile(backupFile)
+        if not chunk then statusText='Резервная копия повреждена'; if showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(syntaxError),-1) end; return false end
+        chunk=nil
+        if doesFileExist(failedFile) then os.remove(failedFile) end
+        local ok,errorText=replaceScript(backupFile,failedFile)
+        if not ok then statusText='Откат не выполнен'; if showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(errorText),-1) end; return false end
+        statusText='Предыдущая версия восстановлена. Перезагрузка...'; sampAddChatMessage('{55DD88}[PayDay Update] {FFFFFF}Предыдущая версия восстановлена.',-1)
+        lua_thread.create(function() wait(1200); pcall(function() thisScript():reload() end) end); return true
+    end
+
+    local function startRequest(item)
+        if not item or networkBusy() then return false end
+        requestNumber=requestNumber+1
+        local requestId=requestNumber
+        local path=item.kind=='check' and apiFile or downloadFile
+        local url=item.kind=='check' and apiUrl or item.asset.url
+        if doesFileExist(path) then os.remove(path) end
+        busy=true; startedAt=os.time(); current=item; current.requestId=requestId; current.path=path
+        statusText=item.kind=='check' and 'Проверяю GitHub Release...' or 'Скачиваю обновление...'
+        local callOk,result=pcall(downloadUrlToFile,url,path,function(id,status,p1,p2)
+            if status~=dlstatus.STATUSEX_ENDDOWNLOAD then return end
+            if busy and current and current.requestId==requestId then finished={requestId=requestId,kind=item.kind,path=path,item=item}
+            elseif doesFileExist(path) then os.remove(path) end
+        end)
+        if not callOk or not result then
+            if item.kind=='check' then afterCheck=nil else installAfterDownload=false end
+            busy=false; startedAt=0; current=nil; if doesFileExist(path) then os.remove(path) end
+            statusText='Не удалось запустить запрос GitHub'; ini.update.last_error=tostring(callOk and result or result); inicfg.save(ini,CONFIG); return false
+        end
+        return true
+    end
+
+    local function finishCheck(result)
+        local requestedAction=afterCheck
+        afterCheck=nil
+        local raw=readFile(result.path) or ''; if doesFileExist(result.path) then os.remove(result.path) end
+        local payload,decodeError=jsonDecode(raw)
+        ini.update.last_check=os.time(); nextAutoCheckAt=os.time()+math.floor((tonumber(ini.update.check_interval_hours) or 6)*3600)
+        if not payload then
+            local errorText=tostring(decodeError or 'Некорректный JSON.'); ini.update.last_error=errorText; statusText='Ошибка проверки GitHub'; inicfg.save(ini,CONFIG)
+            if result.item.showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..errorText,-1) end; return
+        end
+        if payload.message and not payload.tag_name then
+            local errorText='GitHub API: '..tostring(payload.message); ini.update.last_error=errorText; statusText='Ошибка GitHub API'; inicfg.save(ini,CONFIG)
+            if result.item.showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..errorText,-1) end; return
+        end
+        local latest=normalizeVersion(payload.tag_name)
+        if not latest or payload.draft==true or payload.prerelease==true then ini.update.last_error='Некорректный Release.'; statusText='Некорректный GitHub Release'; inicfg.save(ini,CONFIG); return end
+        latestVersion=latest; ini.update.latest_version=latest; ini.update.last_error=''
+        if not isNewer(latest,SCRIPT_VERSION) then
+            latestAsset=nil; installAfterDownload=false; statusText='Установлена последняя версия '..SCRIPT_VERSION; inicfg.save(ini,CONFIG)
+            if result.item.showResult then sampAddChatMessage('{55DD88}[PayDay Update] {FFFFFF}Установлена последняя версия '..SCRIPT_VERSION..'.',-1) end; return
+        end
+        local asset,assetError=selectAsset(payload,latest)
+        if not asset then
+            ini.update.last_error=tostring(assetError); statusText='Release найден, но файл не подходит'; latestAsset=nil; installAfterDownload=false; inicfg.save(ini,CONFIG)
+            if result.item.showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(assetError),-1) end; return
+        end
+        latestAsset=asset; statusText='Доступна версия '..latest; inicfg.save(ini,CONFIG)
+        sampAddChatMessage('{FFD34E}[PayDay Update] {FFFFFF}Доступна версия '..latest..'.',-1)
+        local shouldInstall=requestedAction=='install' or autoUpdate[0]
+        if shouldInstall then
+            installAfterDownload=true
+            queueDownload(result.item.showResult)
+        end
+    end
+
+    local function finishDownload(result)
+        local asset=result.item.asset
+        local ok,errorText=verify(result.path,asset.version,asset.size,asset.digest)
+        if not ok then
+            installAfterDownload=false
+            if doesFileExist(result.path) then os.remove(result.path) end
+            ini.update.last_error=tostring(errorText); statusText='Обновление отклонено проверкой'; inicfg.save(ini,CONFIG)
+            if result.item.showResult then sampAddChatMessage('{FF6666}[PayDay Update] {FFFFFF}'..tostring(errorText),-1) end; return
+        end
+        ini.update.pending_version=asset.version; ini.update.pending_digest=asset.digest; ini.update.pending_size=asset.size; ini.update.pending_asset=asset.name; ini.update.last_error=''; inicfg.save(ini,CONFIG)
+        statusText='Версия '..asset.version..' скачана и проверена'
+        if result.item.showResult then sampAddChatMessage('{55DD88}[PayDay Update] {FFFFFF}Версия '..asset.version..' скачана и проверена.',-1) end
+        local shouldInstall=installAfterDownload or autoUpdate[0]
+        installAfterDownload=false
+        if shouldInstall then install(false) end
+    end
+
+    function M.process()
+        if finished then
+            local result=finished; finished=nil
+            if current and result.requestId==current.requestId then
+                busy=false; startedAt=0; current=nil
+                if result.kind=='check' then finishCheck(result) else finishDownload(result) end
+            elseif result.path and doesFileExist(result.path) then os.remove(result.path) end
+        elseif busy and startedAt>0 and os.time()-startedAt>=45 then
+            local timedOutKind=current and current.kind or nil
+            local path=current and current.path or nil
+            if timedOutKind=='check' then afterCheck=nil else installAfterDownload=false end
+            busy=false; startedAt=0; current=nil
+            if path and doesFileExist(path) then os.remove(path) end
+            statusText='Тайм-аут запроса GitHub'; ini.update.last_error=statusText; inicfg.save(ini,CONFIG)
+        end
+        local now=os.time()
+        if autoUpdate[0] and not busy and not queued and now>=nextAutoCheckAt then
+            local interval=math.floor((tonumber(ini.update.check_interval_hours) or 6)*3600)
+            if now-(tonumber(ini.update.last_check) or 0)>=interval then queueCheck(false,'install')
+            else nextAutoCheckAt=(tonumber(ini.update.last_check) or now)+interval end
+        end
+        if queued and not busy and not networkBusy() then local item=queued; queued=nil; startRequest(item) end
+    end
+
+    local function smartUpdate(showResult)
+        if busy or queued then
+            statusText='Операция обновления уже выполняется'
+            if showResult then
+                sampAddChatMessage('{FFB84D}[PayDay Update] {FFFFFF}Подожди завершения текущей операции.',-1)
+            end
+            return false
+        end
+
+        local pending=tostring(ini.update.pending_version or '')
+        if pending~='' and doesFileExist(downloadFile) then
+            if isNewer(pending,SCRIPT_VERSION) then
+                return install(showResult)
+            end
+            clearPending()
+        end
+
+        if latestAsset and isNewer(latestAsset.version,SCRIPT_VERSION) then
+            installAfterDownload=true
+            return queueDownload(showResult)
+        end
+
+        return queueCheck(showResult,'install')
+    end
+
+    function M.command(argument)
+        local action=tostring(argument or ''):match('^%s*(.-)%s*$'):lower()
+        if action=='rollback' then
+            rollback(true)
+        elseif action=='status' then
+            sampAddChatMessage('{FFD34E}[PayDay Update] {FFFFFF}'..tostring(statusText),-1)
+        else
+            smartUpdate(true)
+        end
+    end
+
+    function M.draw()
+        local pending=tostring(ini.update.pending_version or '')
+        local lastCheck=tonumber(ini.update.last_check) or 0
+        local lastCheckText=lastCheck>0 and os.date('%d.%m.%Y %H:%M:%S',lastCheck) or 'никогда'
+        imgui.SetCursorPos(imgui.ImVec2(260,100)); imgui.SetWindowFontScale(1.15); imgui.Text(u8'Обновления'); imgui.SetWindowFontScale(1.0)
+        imgui.SetCursorPos(imgui.ImVec2(260,126)); textMuted('Одна кнопка: проверить, скачать, проверить и установить')
+        card('update_current',260,160,215,78,'Установлена',SCRIPT_VERSION,2)
+        card('update_latest',492,160,215,78,'Последняя на GitHub',tostring(latestVersion),1)
+        card('update_pending',724,160,236,78,'Готова к установке',pending~='' and pending or 'нет',pending~='' and 2 or 0)
+
+        beginPanel('update_status',260,254,700,124)
+        textMuted('СТАТУС')
+        imgui.SetCursorPos(imgui.ImVec2(16,42)); imgui.PushTextWrapPos(665); textValue(statusText,busy and 1 or 0); imgui.PopTextWrapPos()
+        imgui.SetCursorPos(imgui.ImVec2(16,90)); textMuted('Последняя проверка: '..lastCheckText)
+        endPanel()
+
+        beginPanel('update_simple',260,394,700,112)
+        textMuted('РЕЖИМ')
+        imgui.SetCursorPos(imgui.ImVec2(16,42))
+        if imgui.Checkbox(u8'Автообновление',autoUpdate) then
+            ini.update.auto_check=autoUpdate[0]
+            ini.update.auto_download=autoUpdate[0]
+            ini.update.auto_install=autoUpdate[0]
+            nextAutoCheckAt=os.time()+2
+            inicfg.save(ini,CONFIG)
+        end
+        imgui.SameLine(210); textMuted('Проверка раз в 6 часов, SHA-256, резервная копия и откат.')
+        imgui.SetCursorPos(imgui.ImVec2(16,76)); textMuted('При выключенной галочке обновление запускается одной кнопкой ниже.')
+        endPanel()
+
+        beginPanel('update_actions',260,522,700,114)
+        textMuted('ДЕЙСТВИЯ')
+        imgui.SetCursorPos(imgui.ImVec2(16,42))
+        if imgui.Button(u8'Проверить и обновить',imgui.ImVec2(300,40)) then smartUpdate(true) end
+        imgui.SameLine()
+        if imgui.Button(u8'Вернуть предыдущую версию',imgui.ImVec2(250,40)) then rollback(true) end
+        imgui.SetCursorPos(imgui.ImVec2(16,88)); textMuted('Команда /payupdate делает то же самое, без аргументов.')
+        endPanel()
+    end
+
+    function M.saveSettings()
+        ini.update.auto_check=autoUpdate[0]
+        ini.update.auto_download=autoUpdate[0]
+        ini.update.auto_install=autoUpdate[0]
+    end
+
+    function M.cleanup()
+        if current and current.path and doesFileExist(current.path) then os.remove(current.path) end
+        if doesFileExist(apiFile) then os.remove(apiFile) end
+        if doesFileExist(replacementFile) then os.remove(replacementFile) end
+    end
+
+    return M
+end)()
+
 local miniFrame = imgui.OnFrame(function()
     local st = rankStats()
 
@@ -2501,7 +3432,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
 
     beginPanel('topbar', 12, 10, 976, 62)
     imgui.SetWindowFontScale(1.22)
-    imgui.Text(u8'PAYDAY CENTER 2.0')
+    imgui.Text(u8'PAYDAY CENTER 2.0.11')
     imgui.SetWindowFontScale(1.0)
     textMuted('Arizona RP - экономика, история, контроль Payday и Telegram')
     imgui.SetCursorPos(imgui.ImVec2(926, 10))
@@ -2516,30 +3447,31 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
     tabButton('Окупаемость', 2, 16, 90)
     tabButton('Telegram', 3, 16, 138)
     tabButton('Аналитика', 4, 16, 186)
+    tabButton('Обновления', 5, 16, 234)
 
-    imgui.SetCursorPos(imgui.ImVec2(16, 228))
+    imgui.SetCursorPos(imgui.ImVec2(16, 278))
     imgui.Separator()
-    imgui.SetCursorPos(imgui.ImVec2(16, 248))
+    imgui.SetCursorPos(imgui.ImVec2(16, 296))
     textMuted('СТАТУС')
-    imgui.SetCursorPos(imgui.ImVec2(16, 272))
+    imgui.SetCursorPos(imgui.ImVec2(16, 320))
     imgui.PushTextWrapPos(190)
     textValue(statusText, 1)
     imgui.PopTextWrapPos()
 
-    imgui.SetCursorPos(imgui.ImVec2(16, 334))
+    imgui.SetCursorPos(imgui.ImVec2(16, 374))
     textMuted('PayDay: ' .. tostring(ini.stats.paydays))
-    imgui.SetCursorPos(imgui.ImVec2(16, 360))
+    imgui.SetCursorPos(imgui.ImVec2(16, 398))
     textMuted('Последний:')
-    imgui.SetCursorPos(imgui.ImVec2(16, 382))
+    imgui.SetCursorPos(imgui.ImVec2(16, 420))
     imgui.PushTextWrapPos(190)
     textMuted(tostring(ini.stats.last_payday))
     imgui.PopTextWrapPos()
 
     local st = rankStats()
     if st.cost > 0 and st.baseSalary > 0 then
-        imgui.SetCursorPos(imgui.ImVec2(16, 420))
+        imgui.SetCursorPos(imgui.ImVec2(16, 458))
         imgui.Separator()
-        imgui.SetCursorPos(imgui.ImVec2(16, 440))
+        imgui.SetCursorPos(imgui.ImVec2(16, 474))
         if asBool(ini.rank.tracking) then
             textValue('Счетчик активен', 2)
         elseif asBool(ini.rank.completed) then
@@ -2548,9 +3480,9 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
             textMuted('Счетчик на паузе')
         end
 
-        imgui.SetCursorPos(imgui.ImVec2(16, 468))
+        imgui.SetCursorPos(imgui.ImVec2(16, 500))
         textValue('Осталось: ' .. tostring(st.remainingX1) .. ' ПД x1', 1)
-        imgui.SetCursorPos(imgui.ImVec2(16, 494))
+        imgui.SetCursorPos(imgui.ImVec2(16, 524))
         textMuted('Реально: ' .. tostring(st.remainingReal) .. ' ПД')
     end
     endPanel()
@@ -2561,8 +3493,10 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
         drawRankTab()
     elseif activeTab == 3 then
         drawTelegramTab()
-    else
+    elseif activeTab == 4 then
         drawAnalyticsTab()
+    else
+        updater.draw()
     end
 
     imgui.End()
@@ -2577,6 +3511,8 @@ function main()
     setBuffer(rankSalaryText, rankSalary[0])
     ensureHistoryFile()
     refreshHistoryCache()
+
+    ticketParserSelfTest()
 
     sampRegisterChatCommand('payday', function()
         setMenuState(not window[0])
@@ -2597,22 +3533,28 @@ function main()
     sampRegisterChatCommand('paydebug', paydayDebugCommand)
     sampRegisterChatCommand('paywatch', paydayWatchCommand)
     sampRegisterChatCommand('payafk', paydayWatchCommand) -- старый псевдоним beta-версии
+    sampRegisterChatCommand('payupdate', updater.command)
 
-    print('[Arizona Payday Clean] Commands: /payday /paycalc /paytg /paytgtest /paytgon /paytgoff /paybot /paytgcommands /paystats /payhistory /paydebug /paywatch')
+    print('[Arizona Payday Clean 2.0.11] Main commands: /payday /paytg /paytgtest /payupdate')
 
-    sampAddChatMessage('{FFD34E}[PayDay 2.0] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Настройки 1.7 сохранены.', -1)
+    sampAddChatMessage('{FFD34E}[PayDay 2.0.11] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Настройки сохранены.', -1)
 
-    if telegramCommandsEnabled[0] and telegramCredentialsReady() then
-        queueTelegramCommandRegistration(false)
-    end
+    -- Telegram сохраняет меню команд на своей стороне. На каждом запуске
+    -- повторно регистрировать его не нужно: это задерживало первые сообщения.
 
     local lastMiniState = miniEnabled[0]
 
     while true do
         wait(0)
 
+        -- Явно разводим режимы курсора: мини-окно скрывает его только
+        -- когда главное окно действительно закрыто.
+        miniFrame.HideCursor = not window[0]
+        mainFrame.HideCursor = false
+
         processTelegramTransport()
         processTelegramBotPolling()
+        updater.process()
 
         local now = os.time()
         if now ~= lastWatchdogCheck then
@@ -2642,6 +3584,7 @@ function onScriptTerminate(script, quitGame)
             ini.afk.enabled = afkEnabled[0]
             ini.afk.telegram_alerts = afkTelegramAlerts[0]
             ini.telegram.commands_enabled = telegramCommandsEnabled[0]
+            updater.saveSettings()
             inicfg.save(ini, CONFIG)
         end)
         pcall(function() sampSetCursorMode(0) end)
@@ -2653,6 +3596,7 @@ function onScriptTerminate(script, quitGame)
             if telegramPollResponsePath and doesFileExist(telegramPollResponsePath) then
                 os.remove(telegramPollResponsePath)
             end
+            updater.cleanup()
         end)
     end
 end
