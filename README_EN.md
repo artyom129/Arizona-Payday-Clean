@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.13-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.14-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.13-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.14-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.13 |
+| **Version** | 2.0.14 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -153,14 +153,19 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 2.0.13
+## 🆕 What Is New in Version 2.0.14
 
-- fixed the actual reason why the mini window could not be dragged: a `NoDecoration` window has no title bar for ImGui's standard movement;
-- added a dedicated invisible drag area at the top of the mini window — run `/paymini`, hold the left mouse button there, and drag;
-- movement is now applied manually through `SetWindowPosVec2`, independently of `ConfigWindowsMoveFromTitleBarOnly`;
-- disabled ImGui's built-in movement to prevent double movement across different `mimgui` builds;
-- synchronized player-control locking with move mode through `OnFrame.LockPlayer`;
-- coordinates remain clamped to the screen and are saved to `ArizonaPaydayClean.ini` after **Done**, `ESC`, or another `/paymini`.
+- removed the custom drag calls introduced in 2.0.13, which could terminate the script on some `mimgui` builds;
+- restored the known-loadable 2.0.12 code path;
+- `/paymini` now shows a standard ImGui title bar, allowing native window movement without additional APIs;
+- `NoDecoration` and `NoInputs` are used only in passive mode, where the overlay must not interfere with gameplay;
+- increased the setup-mode height so the title bar and **Done** button do not overlap the content;
+- the position is saved after **Done**, `ESC`, or another `/paymini`; `/paymini reset` restores the default coordinates.
+
+## Included in Version 2.0.13
+
+- introduced an experimental custom drag area;
+- this approach was removed after a game-build compatibility issue and replaced with the native title bar in 2.0.14.
 
 ## Included in Version 2.0.12
 

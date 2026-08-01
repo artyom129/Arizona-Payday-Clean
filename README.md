@@ -5,7 +5,7 @@
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.13-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.14-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.13-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.14-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -37,7 +37,7 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 2.0.13 |
+| **Версия** | 2.0.14 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
 | **Основной файл** | `ArizonaPaydayClean.lua` |
@@ -157,14 +157,19 @@
 
 ---
 
-## 🆕 Что нового в версии 2.0.13
+## 🆕 Что нового в версии 2.0.14
 
-- исправлена настоящая причина, из-за которой мини-окно не перетаскивалось: у окна с `NoDecoration` отсутствовал заголовок для стандартного перемещения ImGui;
-- добавлена отдельная невидимая drag-зона в верхней части мини-окна — в режиме `/paymini` нужно зажать её левой кнопкой мыши и потянуть;
-- перемещение теперь выполняется вручную через `SetWindowPosVec2` и работает независимо от настройки `ConfigWindowsMoveFromTitleBarOnly`;
-- встроенное перемещение ImGui отключено, чтобы разные сборки `mimgui` не сдвигали окно дважды;
-- блокировка управления персонажем синхронизирована с режимом перемещения через `OnFrame.LockPlayer`;
-- координаты по-прежнему ограничиваются экраном и сохраняются в `ArizonaPaydayClean.ini` после нажатия **«Готово»**, `ESC` или повторного `/paymini`.
+- удалены несовместимые ручные вызовы перетаскивания из 2.0.13, из-за которых скрипт мог завершаться в некоторых сборках `mimgui`;
+- код возвращён на проверенную загружаемую основу 2.0.12;
+- в режиме `/paymini` у мини-окна теперь появляется обычный заголовок ImGui — за него окно перемещается штатным механизмом без дополнительных API;
+- `NoDecoration` и `NoInputs` используются только в пассивном режиме, когда окно не должно мешать игре;
+- высота окна в режиме настройки увеличена, чтобы заголовок и кнопка **«Готово»** не перекрывали содержимое;
+- позиция сохраняется после **«Готово»**, `ESC` или повторного `/paymini`; `/paymini reset` возвращает стандартные координаты.
+
+## Что вошло в версию 2.0.13
+
+- была добавлена экспериментальная ручная drag-зона;
+- из-за несовместимости с игровой сборкой этот способ удалён и заменён штатным заголовком в 2.0.14.
 
 ## Что вошло в версию 2.0.12
 
