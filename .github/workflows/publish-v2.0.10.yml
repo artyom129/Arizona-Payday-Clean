@@ -1,0 +1,40 @@
+name: Publish v2.0.10
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.upload/v2.0.10/**'
+      - '.github/workflows/publish-v2.0.10.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rebuild Lua source
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .upload/v2.0.10/ArizonaPaydayClean.lua.gz.b64 | gzip --decompress > ArizonaPaydayClean.lua
+          cp ArizonaPaydayClean.lua ArizonaPaydayClean_v2_0_10_Artty.lua
+          grep -Fq "local SCRIPT_VERSION = '2.0.10'" ArizonaPaydayClean.lua
+          grep -Fq "Талон" releases/v2.0.10.md
+          test -s ArizonaPaydayClean.lua
+
+      - name: Commit final files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upload/v2.0.10
+          rm -f .github/workflows/publish-v2.0.10.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release v2.0.10: fix AZ ticket counting"
+          git push
