@@ -1,0 +1,83 @@
+name: Publish v2.0.17 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v2.0.17.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify release file
+        shell: bash
+        run: |
+          test "$(sha256sum ArizonaPaydayClean.lua | cut -d ' ' -f 1)" = "7e001a57d7dbba22b8556f79c666605e8e91f5aaff929666293dee8b58a32d7b"
+          test "$(wc -c < ArizonaPaydayClean.lua)" = "155623"
+          grep -aFq "local SCRIPT_VERSION = '2.0.17'" ArizonaPaydayClean.lua
+
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/release-v2.0.17.yml
+          git commit -m "Remove temporary v2.0.17 release workflow"
+          git push
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          git tag -f v2.0.17 "$release_sha"
+          git push origin refs/tags/v2.0.17 --force
+
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Arizona Payday Clean v2.0.17 — защита и восстановление данных
+
+          Исправлена критичная проблема, при которой после обновления или оборванной записи могли отображаться нулевые накопленные данные.
+
+          ### Восстановление
+
+          - Если основной INI пустой, скрипт проверяет **ArizonaPaydayClean.backup.ini**, старый **ArizonaPaydayClean_v1_backup.ini**, незавершённые временные файлы и возможный **ArizonaPaydayClean.ini.ini**.
+          - Если INI уже обнулился, количество Payday и общие суммы восстанавливаются из полного **ArizonaPaydayHistory.csv**.
+          - Добавлена команда **/payrecover** для повторного ручного восстановления.
+          - При успешном автоматическом восстановлении скрипт сообщает источник в игровом чате.
+
+          ### Защита от повторной потери
+
+          - Перед изменением INI сохраняется последняя содержательная копия.
+          - INI записывается во временный файл и заменяется атомарно с откатом.
+          - История получает отдельную копию **ArizonaPaydayHistory.backup.csv**.
+          - Обрезанный или пустой CSV автоматически заменяется более полной копией.
+          - Поздний талон больше не перезаписывает основной CSV напрямую.
+          - Осознанный сброс статистики отмечается отдельно и не отменяется автоматически.
+
+          ### Совместимость и проверка
+
+          - Мини-окно осталось неподвижным на исходных координатах.
+          - Финальный файл сохранён в CP1251 и проверен LuaJIT 2.1 через **loadfile()**.
+          - 188 локальных переменных из 200, запас 12.
+          - SHA-256: **7e001a57d7dbba22b8556f79c666605e8e91f5aaff929666293dee8b58a32d7b**.
+
+          ### Что делать после установки
+
+          Не удаляйте файлы из **moonloader/config**. Замените только **ArizonaPaydayClean.lua**, запустите игру и проверьте сообщение **PayDay Recovery**. Если данные не появились автоматически, введите **/payrecover**.
+          EOF
+
+          if gh release view v2.0.17 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v2.0.17 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit v2.0.17 --repo "$GITHUB_REPOSITORY" --target "$release_sha" --title "Arizona Payday Clean v2.0.17" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create v2.0.17 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --verify-tag --target "$release_sha" --title "Arizona Payday Clean v2.0.17" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
