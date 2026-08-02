@@ -4,33 +4,39 @@
 
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
-[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.20-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-2.0.20-F59E0B?style=for-the-badge)](#)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
-[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
+[![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
 
 [Русская версия](README.md) · **English**
-
-<br>
-
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.20-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
 > [!NOTE]
-> Some of the most useful projects are created simply to stop doing the same repetitive task every day.
+> Sometimes the most useful projects are created simply to stop doing the same repetitive task every day.
 
 ---
 
-## 📌 About
+## 📌 About the Project
 
-**Arizona Payday Clean** is a free MoonLoader script for Arizona RP. It automatically tracks Payday data, income, rank payback, regular AZ Coins, AZ ticket items, history, Telegram reports, and missed-Payday monitoring.
+**Arizona Payday Clean** is a free MoonLoader script for Arizona RP that:
+
+- automatically reads Payday data;
+- tracks lifetime and current-session statistics;
+- calculates purchased-rank payback;
+- tracks bank, deposit, regular AZ Coins, and AZ ticket items;
+- stores Payday history in CSV;
+- sends reports and answers Telegram bot commands;
+- recovers data from safe backups;
+- keeps working while the game is minimized.
 
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
 | **Version** | 2.0.20 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
+| **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
 | **Configuration** | `moonloader/config/ArizonaPaydayClean.ini` |
 | **History** | `moonloader/config/ArizonaPaydayHistory.csv` |
@@ -46,47 +52,53 @@
 ### 📊 Statistics
 
 - automatic Payday detection;
-- bank, deposit, salary, and balances;
-- lifetime and current-session statistics;
+- salary and deposit income;
+- bank and deposit balances;
+- regular AZ Coins;
+- AZ ticket items;
+- session and lifetime totals;
 - CSV history;
-- safe INI and history backups;
-- recovery tools.
+- backup recovery.
 
 </td>
 <td width="50%" valign="top">
 
 ### 📈 Rank Payback
 
-- rank price and x1 salary;
+- rank price;
+- x1 salary;
 - multiplier detection;
 - optional deposit income;
 - repaid and remaining amounts;
-- Payday and time forecast;
-- fixed mini overlay.
+- remaining Payday estimate;
+- approximate payback time.
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🪙 AZ Coins
+### 🖥 Interface
 
-- regular AZ Coins tracking;
-- separate AZ ticket tracking;
-- duplicate-event protection;
-- late rewards added to the latest Payday;
-- INI, CSV, UI, and Telegram synchronization.
+- main `mimgui` window;
+- compact fixed mini overlay;
+- Telegram, analytics, and updater tabs;
+- saved settings;
+- minimized-game operation;
+- adaptive background loop.
 
 </td>
 <td width="50%" valign="top">
 
 ### 📬 Telegram
 
-- formatted HTML reports;
+- automatic Payday reports;
+- test message;
+- bot commands;
+- configured `chat_id` authorization;
 - asynchronous request queue;
-- bot commands restricted to the configured `chat_id`;
-- missed-Payday alerts;
-- long polling without external processes.
+- long polling;
+- no external processes.
 
 </td>
 </tr>
@@ -98,59 +110,47 @@
 
 Version 2.0.20 reduces background CPU usage:
 
-- the service loop no longer performs all work every rendered frame;
-- approximately 10 ms delay while the main window is open;
+- the main service loop no longer runs all tasks every rendered frame;
+- approximately 10 ms delay while the window is open;
 - approximately 50 ms while the game is active;
-- approximately 250 ms while the game is minimized;
-- the mini overlay is not rendered while GTA is inactive;
-- mini-overlay calculations are cached;
-- Telegram uses long polling with a timeout of up to 20 seconds;
-- server event handlers for Payday and ticket items remain event-driven.
+- approximately 250 ms while GTA is minimized;
+- the mini overlay is not rendered while the game is inactive;
+- overlay calculations are cached;
+- Telegram uses long polling up to 20 seconds;
+- Payday and ticket handling remains event-driven.
 
-Actual CPU usage must be verified inside GTA because MoonLoader and other installed scripts share the same process.
+Actual CPU usage must be verified inside GTA because all MoonLoader scripts share the same game process.
 
 ---
 
 ## 🚀 Installation
 
 1. Close GTA completely.
-2. Download `ArizonaPaydayClean.lua` from the latest GitHub Release.
-3. Keep only one script copy in `moonloader`.
-4. Copy the file to:
-
-```text
-GTA San Andreas/
-└── moonloader/
-    └── ArizonaPaydayClean.lua
-```
-
-5. Do not delete:
-
-```text
-moonloader/config/ArizonaPaydayClean.ini
-moonloader/config/ArizonaPaydayHistory.csv
-```
-
-6. Start the game and use `/payday`.
+2. Download `ArizonaPaydayClean.lua` from the latest Release.
+3. Keep only one copy in `moonloader`.
+4. Replace the old Lua file.
+5. Do not delete `moonloader/config/ArizonaPaydayClean.ini`.
+6. Do not delete `moonloader/config/ArizonaPaydayHistory.csv`.
+7. Start the game and use `/payday`.
 
 ---
 
-## ⌨️ Main Commands
+## ⌨️ Commands
 
 | Command | Purpose |
 |---|---|
-| `/payday` | open or close the main window |
-| `/paystats` | current-session statistics |
-| `/payhistory` | recent Payday records |
-| `/payrecover` | recover available data |
-| `/paydebug` | toggle diagnostic logging |
-| `/paywatch` | toggle missed-Payday monitoring |
-| `/paymini` | show or hide the mini overlay |
-| `/paytg TOKEN CHAT_ID` | configure Telegram |
-| `/paytgtest` | send a test report |
-| `/paybot` | toggle Telegram bot commands |
-| `/payupdate` | check and install an update |
-| `/payupdate rollback` | restore the previous Lua file |
+| `/payday` | Open or close the main window |
+| `/paystats` | Show session statistics |
+| `/payhistory` | Show recent Payday records |
+| `/payrecover` | Recover available data |
+| `/paydebug` | Toggle diagnostic logging |
+| `/paywatch` | Toggle missed-Payday monitoring |
+| `/paymini` | Show or hide the mini overlay |
+| `/paytg TOKEN CHAT_ID` | Configure Telegram |
+| `/paytgtest` | Send a test report |
+| `/paybot` | Toggle Telegram bot commands |
+| `/payupdate` | Check and install an update |
+| `/payupdate rollback` | Restore the previous Lua file |
 
 ---
 
@@ -158,36 +158,41 @@ moonloader/config/ArizonaPaydayHistory.csv
 
 `/start`, `/help`, `/status`, `/ping`, `/stats`, `/today`, `/rank`, `/history`, `/watch`, `/settings`, and `/version`.
 
-Remote gameplay control and remote setting changes are intentionally disabled.
+Remote gameplay control and remote setting changes are disabled.
 
 ---
 
-## 🔄 Updater Safety
+## 🔐 Security
 
-The updater downloads to a temporary file, verifies the version and size, checks SHA-256 when a digest is available, creates a backup, rejects downgrades, and supports rollback. It does not use `os.execute`, `io.popen`, PowerShell, or `curl.exe`.
+- the bot token is stored only in the local INI;
+- the token field is hidden in the interface;
+- commands from other `chat_id` values are ignored;
+- the bot cannot control the character;
+- `os.execute`, `io.popen`, PowerShell, and `curl.exe` are not used.
 
 ---
 
-## 📦 GitHub Release Asset
-
-Upload this file to the release:
+## 📦 GitHub Release v2.0.20
 
 ```text
-ArizonaPaydayClean.lua
-```
-
-Verification:
-
-```text
+Tag: v2.0.20
+Title: Arizona Payday Clean v2.0.20
+Asset: ArizonaPaydayClean.lua
 Size: 178384 bytes
 SHA-256: a6d3565322d9d084376186084614ec94e54aa15a898996f515ea1bdb3bddc453
 Encoding: CP1251
 ```
 
-Release notes are stored in `releases/v2.0.20.md`.
-
 ---
 
-## 📜 Author
+## 📄 License
 
-Created by **Artty** and distributed for free.
+The project is distributed free of charge. Keep the original author credit when publishing modified builds.
+
+<div align="center">
+
+### Take care. Good luck with everything you do.
+
+**Artty**
+
+</div>
