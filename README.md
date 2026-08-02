@@ -5,7 +5,7 @@
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.15-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.16-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.15-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.16-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -37,7 +37,7 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 2.0.15 |
+| **Версия** | 2.0.16 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
 | **Основной файл** | `ArizonaPaydayClean.lua` |
@@ -157,7 +157,20 @@
 
 ---
 
-## 🆕 Что нового в версии 2.0.15
+## 🆕 Что нового в версии 2.0.16
+
+- исправлена потеря быстрых последовательных талонов: антидубль теперь отличает повтор одного уведомления от нового начисления;
+- окно антидубля сокращено с 2,5 до 1,2 секунды, а сравнение учитывает источник, текст и совместимость баланса;
+- длинные Payday-отчёты и `/paytgtest` безопасно делятся между строками, чтобы кириллица после URL-кодирования не ломала отправку через MoonLoader;
+- очередь сохраняет правильный порядок частей, а подтверждение появляется только после последней;
+- меню Telegram-бота дополнено реально поддерживаемыми `/stats`, `/today`, `/rank`, `/watch` и `/version`;
+- справка `/help` синхронизирована с обработчиком команд;
+- убраны оставшиеся жёстко прописанные подписи `PayDay 2.0` — сообщения всегда показывают фактическую версию;
+- в основном блоке осталось **186** локальных переменных — запас **14** до лимита LuaJIT;
+- мини-окно по-прежнему закреплено на исходных координатах и не перетаскивается;
+- релиз получил новый номер, поэтому встроенное автообновление действительно увидит исправления.
+
+## Что вошло в версию 2.0.15
 
 - исправлена точная загрузочная ошибка из `moonloader.log`: `main function has more than 200 local variables`;
 - количество локальных переменных в основном блоке снижено с **201 до 194**, ниже жёсткого лимита LuaJIT/MoonLoader;

@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.15'
+local SCRIPT_VERSION = '2.0.16'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -326,9 +326,8 @@ local paydaySignals = {
 }
 local recentTicketGain = 0
 local recentTicketAt = 0
-local lastTicketKey = ''
-local lastTicketAtMs = 0
-local TICKET_DUPLICATE_WINDOW_MS = 2500
+local ticketDedupe = { plus = 0, balance = 0, atMs = 0, source = '', text = '' }
+local TICKET_DUPLICATE_WINDOW_MS = 1200
 
 local W = imgui.WindowFlags or {}
 local function flags(...)
@@ -945,13 +944,44 @@ local function urlEncodeUtf8(value)
     end))
 end
 
+-- MoonLoader отправляет Telegram-запросы через downloadUrlToFile (GET).
+-- Длинный отчёт с кириллицей после percent-encoding может превысить
+-- безопасную длину URL в старых WinINet/URLMon-сборках, поэтому режем его
+-- только между строками, где HTML-теги уже закрыты.
+local TELEGRAM_MAX_ENCODED_TEXT = 1700
+
+local function splitTelegramMessage(message)
+    local parts = {}
+    local current = ''
+
+    for line in (tostring(message or '') .. string.char(10)):gmatch('(.-)' .. string.char(10)) do
+        local candidate = current == '' and line or (current .. string.char(10) .. line)
+        if current == '' or #urlEncodeUtf8(candidate) <= TELEGRAM_MAX_ENCODED_TEXT then
+            current = candidate
+        else
+            table.insert(parts, current)
+            current = line
+        end
+    end
+
+    if current ~= '' then table.insert(parts, current) end
+    if #parts == 0 then table.insert(parts, tostring(message or '')) end
+    return parts
+end
+
 
 local TELEGRAM_BOT_COMMANDS = {
-    { command = 'start', description = 'Открыть меню' },
-    { command = 'status', description = 'Полный статус и статистика' },
-    { command = 'history', description = 'Последние Payday' },
-    { command = 'settings', description = 'Состояние настроек' },
-    { command = 'help', description = 'Справка' }
+    -- ASCII-описания держат единый setMyCommands GET-запрос коротким.
+    { command = 'start', description = 'Open menu' },
+    { command = 'status', description = 'Script status' },
+    { command = 'stats', description = 'All-time stats' },
+    { command = 'today', description = 'Today stats' },
+    { command = 'history', description = 'Recent Payday history' },
+    { command = 'rank', description = 'Rank payback' },
+    { command = 'watch', description = 'Payday monitor' },
+    { command = 'settings', description = 'Current settings' },
+    { command = 'version', description = 'Script version' },
+    { command = 'help', description = 'Command help' }
 }
 
 local function jsonEscape(value)
@@ -1361,7 +1391,8 @@ local function sendTelegramMessage(message, showResult, options)
         return false
     end
 
-    if #telegramQueue >= 20 then
+    local parts = splitTelegramMessage(message)
+    if #telegramQueue + #parts > 20 then
         telegramLog('Queue is full; message dropped.')
         if showResult then
             sampAddChatMessage('{FF6666}[PayDay TG] {FFFFFF}Очередь отправки переполнена.', -1)
@@ -1369,22 +1400,32 @@ local function sendTelegramMessage(message, showResult, options)
         return false
     end
 
-    local item = {
-        method = 'sendMessage',
-        message = message,
-        chatId = options.chatId,
-        requiresNotifications = requiresNotifications,
-        showResult = showResult == true
-    }
-
     -- Пока идёт исходящая отправка, не запускаем новый long polling.
     -- Тест и ответы на команды ставятся вперед очереди, чтобы не ждать
     -- фонового обновления меню бота или обычных уведомлений.
     telegramPollPauseUntil = math.max(telegramPollPauseUntil, os.time() + 3)
-    if showResult == true or options.priority == true then
-        table.insert(telegramQueue, 1, item)
-    else
-        table.insert(telegramQueue, item)
+    local priority = showResult == true or options.priority == true
+    local first, last, step = 1, #parts, 1
+    if priority then first, last, step = #parts, 1, -1 end
+
+    for index = first, last, step do
+        local item = {
+            method = 'sendMessage',
+            message = parts[index],
+            chatId = options.chatId,
+            requiresNotifications = requiresNotifications,
+            -- Подтверждение показываем после последней части, а не после каждой.
+            showResult = showResult == true and index == #parts
+        }
+        if priority then
+            table.insert(telegramQueue, 1, item)
+        else
+            table.insert(telegramQueue, item)
+        end
+    end
+
+    if #parts > 1 then
+        telegramLog('Long message split into ' .. tostring(#parts) .. ' safe requests.')
     end
 
     processTelegramTransport()
@@ -1455,8 +1496,13 @@ local function telegramBotHelpMessage()
         .. string.char(10) .. '<LINE>'
         .. string.char(10) .. string.char(10)
         .. '/status — полный статус и статистика'
+        .. string.char(10) .. '/stats — общая статистика'
+        .. string.char(10) .. '/today — статистика за сегодня'
         .. string.char(10) .. '/history 5 — последние Payday'
+        .. string.char(10) .. '/rank — окупаемость ранга'
+        .. string.char(10) .. '/watch — контроль пропущенного Payday'
         .. string.char(10) .. '/settings — состояние уведомлений и контроля'
+        .. string.char(10) .. '/version — версия скрипта'
         .. string.char(10) .. '/help — эта справка'
         .. string.char(10) .. string.char(10)
         .. '<i>Изменение настроек выполняется только внутри игры.</i>'
@@ -2125,17 +2171,25 @@ local function processTicketLine(text, nums, sourceName)
 
     -- Одна и та же серверная подсказка может одновременно попасть в чат,
     -- GameText и TextDraw. Блокируем только этот короткий межсобытийный дубль.
-    local duplicateKey = tostring(plus) .. ':' .. tostring(balance)
-    local duplicateElapsed = nowMs - lastTicketAtMs
-    if duplicateKey == lastTicketKey
+    local ticketSource = tostring(sourceName or 'unknown')
+    local duplicateElapsed = nowMs - ticketDedupe.atMs
+    local sameAward = plus == ticketDedupe.plus
+    local compatibleBalance = balance <= 0 or ticketDedupe.balance <= 0
+        or balance == ticketDedupe.balance
+    local sameEventPath = ticketSource ~= ticketDedupe.source
+        or cleanText == ticketDedupe.text
+    if sameAward and compatibleBalance and sameEventPath
         and duplicateElapsed >= 0 and duplicateElapsed <= TICKET_DUPLICATE_WINDOW_MS then
         debugLog('TICKET CROSS-EVENT DUPLICATE SKIPPED ['
             .. tostring(sourceName or 'unknown') .. ']: ' .. cleanText)
         return false
     end
 
-    lastTicketKey = duplicateKey
-    lastTicketAtMs = nowMs
+    ticketDedupe.plus = plus
+    ticketDedupe.balance = balance
+    ticketDedupe.atMs = nowMs
+    ticketDedupe.source = ticketSource
+    ticketDedupe.text = cleanText
 
     if balance <= 0 and plus > 0 then
         balance = previousBalance + plus
@@ -2302,7 +2356,7 @@ markPayday = function()
         .. ' signals=' .. tostring(paydaySignalCount()))
 
     if not salaryReceived then
-        sampAddChatMessage('{FFB84D}[PayDay 2.0] {FFFFFF}Payday учтен, но строка зарплаты не пришла. Остальные данные сохранены.', -1)
+        sampAddChatMessage('{FFB84D}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Payday учтен, но строка зарплаты не пришла. Остальные данные сохранены.', -1)
     end
 
     if telegramReady() then
@@ -2429,9 +2483,9 @@ local function paydayStatsCommand()
     local income = session.salary + session.deposit
     local average = session.paydays > 0 and math.floor(income / session.paydays) or 0
 
-    sampAddChatMessage('{FFD34E}[PayDay 2.0] {FFFFFF}Сессия: ' .. sessionDurationText()
+    sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Сессия: ' .. sessionDurationText()
         .. ' | Payday: ' .. tostring(session.paydays), -1)
-    sampAddChatMessage('{FFD34E}[PayDay 2.0] {FFFFFF}Доход: ' .. money(income)
+    sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Доход: ' .. money(income)
         .. ' | Средний: ' .. money(average)
         .. ' | AZ: ' .. tostring(session.az)
         .. ' | Талоны: ' .. tostring(session.tickets), -1)
@@ -2439,11 +2493,11 @@ end
 
 local function paydayHistoryCommand()
     if #historyCache == 0 then
-        sampAddChatMessage('{FFB84D}[PayDay 2.0] {FFFFFF}История пока пуста.', -1)
+        sampAddChatMessage('{FFB84D}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}История пока пуста.', -1)
         return
     end
 
-    sampAddChatMessage('{FFD34E}[PayDay 2.0] {FFFFFF}Последние Payday:', -1)
+    sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Последние Payday:', -1)
     local first = math.max(1, #historyCache - 4)
     for i = #historyCache, first, -1 do
         local row = historyCache[i]
