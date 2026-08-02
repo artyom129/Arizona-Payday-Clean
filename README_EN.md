@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.16-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.17-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.16-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.17-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.16 |
+| **Version** | 2.0.17 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -153,7 +153,20 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 2.0.16
+## 🆕 What Is New in Version 2.0.17
+
+- fixed accumulated statistics being lost after an update or an interrupted INI save;
+- automatically creates `ArizonaPaydayClean.backup.ini` before changes, while an empty config cannot replace a meaningful backup;
+- INI saving now uses a temporary file and an atomic replacement with rollback;
+- if the primary config is empty, recovery checks the safe backup, `ArizonaPaydayClean_v1_backup.ini`, interrupted temporary files, and an accidental `.ini.ini` file;
+- lifetime totals and Payday count are rebuilt from the complete `ArizonaPaydayHistory.csv` when the INI has already been reset;
+- creates `ArizonaPaydayHistory.backup.csv` and automatically restores the more complete copy over a truncated or empty CSV;
+- late ticket rewards no longer rewrite history directly with `wb`; a safe temporary write and rollback are used;
+- added `/payrecover` for a manual recovery scan;
+- an intentional statistics reset is marked separately and is not undone automatically;
+- the CP1251 release file uses **188** top-level locals, leaving **12** below LuaJIT's hard limit.
+
+## Included in Version 2.0.16
 
 - fixed dropped rapid consecutive ticket rewards: duplicate protection now distinguishes one repeated notification from a new reward;
 - shortened the duplicate window from 2.5 to 1.2 seconds and now compares source, text, and compatible balances;
@@ -329,6 +342,7 @@ Telegram settings, statistics, and payback progress are preserved.
 | `/paycalc` | Alternative command for opening the window |
 | `/paystats` | Show current-session statistics |
 | `/payhistory` | Show recent Payday records in game chat |
+| `/payrecover` | Restore statistics and history from backups/CSV |
 | `/paywatch` | Enable or disable missed-Payday monitoring |
 | `/paydebug` | Enable or disable the diagnostic log |
 | `/paymini` | Show or hide the fixed-position mini window |
@@ -431,7 +445,9 @@ moonloader.log
 |---|---|
 | `ArizonaPaydayClean.ini` | Settings and main statistics |
 | `ArizonaPaydayClean_v1_backup.ini` | Backup created before migration from 1.x |
+| `ArizonaPaydayClean.backup.ini` | Automatic last meaningful INI backup |
 | `ArizonaPaydayHistory.csv` | Payday history for viewing and analysis |
+| `ArizonaPaydayHistory.backup.csv` | Automatic full-history backup |
 | `ArizonaPaydayTelegramResponse_*.json` | Temporary send-response file; removed automatically |
 | `ArizonaPaydayTelegramUpdates_*.json` | Temporary `getUpdates` response; removed automatically |
 | `ArizonaPaydayDebug.log` | Diagnostics created while `/paydebug` is enabled |

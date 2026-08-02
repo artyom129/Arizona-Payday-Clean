@@ -5,7 +5,7 @@
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.16-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.17-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.16-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.17-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -37,7 +37,7 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 2.0.16 |
+| **Версия** | 2.0.17 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
 | **Основной файл** | `ArizonaPaydayClean.lua` |
@@ -157,7 +157,20 @@
 
 ---
 
-## 🆕 Что нового в версии 2.0.16
+## 🆕 Что нового в версии 2.0.17
+
+- исправлена потеря накопленной статистики после обновления или повреждённого сохранения INI;
+- перед изменением автоматически создаётся `ArizonaPaydayClean.backup.ini`, причём пустой конфиг не заменяет содержательную копию;
+- сохранение INI теперь выполняется через временный файл и атомарную замену с возможностью отката;
+- при пустом основном конфиге проверяются безопасная копия, `ArizonaPaydayClean_v1_backup.ini`, незавершённые временные файлы и ошибочный двойной файл `.ini.ini`;
+- общие суммы и количество Payday восстанавливаются из полного `ArizonaPaydayHistory.csv`, если INI уже обнулился;
+- для истории создаётся `ArizonaPaydayHistory.backup.csv`, а более полная копия автоматически возвращается вместо обрезанного или пустого CSV;
+- позднее начисление талона больше не переписывает историю напрямую через `wb`: используется безопасная временная запись и откат;
+- добавлена команда `/payrecover` для повторного ручного восстановления;
+- осознанный сброс статистики помечается отдельно и не отменяется автоматическим восстановлением;
+- релизный CP1251-файл использует **188** локальных переменных — запас **12** до лимита LuaJIT.
+
+## Что вошло в версию 2.0.16
 
 - исправлена потеря быстрых последовательных талонов: антидубль теперь отличает повтор одного уведомления от нового начисления;
 - окно антидубля сокращено с 2,5 до 1,2 секунды, а сравнение учитывает источник, текст и совместимость баланса;
@@ -331,6 +344,7 @@ moonloader/config/ArizonaPaydayClean_v1_backup.ini
 | `/paycalc` | Альтернативная команда открытия окна |
 | `/paystats` | Показать статистику текущего запуска |
 | `/payhistory` | Показать последние Payday в игровом чате |
+| `/payrecover` | Восстановить статистику и историю из резервных файлов/CSV |
 | `/paywatch` | Включить или выключить контроль пропущенного Payday |
 | `/paydebug` | Включить или выключить диагностический лог |
 | `/paymini` | Показать или скрыть фиксированное мини-окно |
@@ -433,7 +447,9 @@ moonloader.log
 |---|---|
 | `ArizonaPaydayClean.ini` | Настройки и основная статистика |
 | `ArizonaPaydayClean_v1_backup.ini` | Резервная копия перед миграцией с 1.x |
+| `ArizonaPaydayClean.backup.ini` | Автоматическая последняя содержательная копия INI |
 | `ArizonaPaydayHistory.csv` | История Payday для просмотра и анализа |
+| `ArizonaPaydayHistory.backup.csv` | Автоматическая копия полной истории |
 | `ArizonaPaydayTelegramResponse_*.json` | Временный ответ на отправку сообщения; удаляется автоматически |
 | `ArizonaPaydayTelegramUpdates_*.json` | Временный ответ `getUpdates`; удаляется автоматически |
 | `ArizonaPaydayDebug.log` | Диагностика, создаётся при включённом `/paydebug` |

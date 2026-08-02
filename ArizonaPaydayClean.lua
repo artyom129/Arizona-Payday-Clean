@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.16'
+local SCRIPT_VERSION = '2.0.17'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -26,7 +26,263 @@ local CONFIG_PATH = CONFIG_DIR .. '\\' .. CONFIG
 local HISTORY_FILE = CONFIG_DIR .. '\\ArizonaPaydayHistory.csv'
 local DEBUG_FILE = CONFIG_DIR .. '\\ArizonaPaydayDebug.log'
 local BACKUP_FILE = CONFIG_DIR .. '\\ArizonaPaydayClean_v1_backup.ini'
+
+-- ’ранилище защищает накопленные данные независимо от игрового интерфейса.
+-- ¬с€ логика собрана в одной таблице, чтобы не уперетьс€ в лимит LuaJIT
+-- на 200 локальных переменных в основном блоке.
+local STORAGE = {
+    configBackup = CONFIG_DIR .. '\\ArizonaPaydayClean.backup.ini',
+    configPrevious = CONFIG_DIR .. '\\ArizonaPaydayClean.previous.ini',
+    configTemp = CONFIG_DIR .. '\\ArizonaPaydayClean.saving.ini',
+    configTempName = 'ArizonaPaydayClean.saving.ini',
+    legacyDoubleConfig = CONFIG_DIR .. '\\ArizonaPaydayClean.ini.ini',
+    historyBackup = CONFIG_DIR .. '\\ArizonaPaydayHistory.backup.csv',
+    historyPrevious = CONFIG_DIR .. '\\ArizonaPaydayHistory.previous.csv',
+    historyTemp = CONFIG_DIR .. '\\ArizonaPaydayHistory.saving.csv',
+    rawIniSave = inicfg.save,
+    recovered = false,
+    recoveredSource = ''
+}
+
+function STORAGE.read(path)
+    local file = io.open(path, 'rb')
+    if not file then return nil end
+    local data = file:read('*a') or ''
+    file:close()
+    return data
+end
+
+function STORAGE.copy(sourcePath, destinationPath)
+    local data = STORAGE.read(sourcePath)
+    if not data then return false end
+    local file = io.open(destinationPath, 'wb')
+    if not file then return false end
+    file:write(data)
+    file:close()
+    return true
+end
+
+function STORAGE.parseIni(path)
+    local data = STORAGE.read(path)
+    if not data or data == '' then return nil end
+    local result, section = {}, nil
+    for rawLine in (data .. '\n'):gmatch('(.-)\r?\n') do
+        local line = rawLine:match('^%s*(.-)%s*$') or ''
+        if line ~= '' and line:sub(1, 1) ~= ';' and line:sub(1, 1) ~= '#' then
+            local sectionName = line:match('^%[([^%]]+)%]$')
+            if sectionName then
+                section = sectionName
+                result[section] = result[section] or {}
+            elseif section then
+                local key, value = line:match('^([^=]+)=(.*)$')
+                if key then
+                    key = key:match('^%s*(.-)%s*$') or key
+                    value = value:match('^%s*(.-)%s*$') or value
+                    if (#value >= 2) and ((value:sub(1, 1) == '"' and value:sub(-1) == '"')
+                        or (value:sub(1, 1) == "'" and value:sub(-1) == "'")) then
+                        value = value:sub(2, -2)
+                    end
+                    result[section][key] = value
+                end
+            end
+        end
+    end
+    return next(result) and result or nil
+end
+
+function STORAGE.iniScore(config)
+    if type(config) ~= 'table' then return -1 end
+    local stats = type(config.stats) == 'table' and config.stats or {}
+    local rank = type(config.rank) == 'table' and config.rank or {}
+    local telegram = type(config.telegram) == 'table' and config.telegram or {}
+    local paydays = math.max(0, tonumber(stats.paydays) or 0)
+    local caught = math.max(0, tonumber(rank.caught_paydays) or 0)
+    local flags = 0
+    local tracked = {
+        stats.total_salary, stats.total_deposit, stats.total_az, stats.total_tickets,
+        rank.cost, rank.salary_x1, rank.repaid
+    }
+    for _, value in ipairs(tracked) do
+        if (tonumber(value) or 0) > 0 then flags = flags + 1 end
+    end
+    if tostring(telegram.token or '') ~= '' then flags = flags + 1 end
+    if tostring(telegram.chat_id or '') ~= '' then flags = flags + 1 end
+    return paydays * 1000000 + caught * 1000 + flags
+end
+
+function STORAGE.snapshotConfig()
+    local currentScore = STORAGE.iniScore(STORAGE.parseIni(CONFIG_PATH))
+    local backupScore = STORAGE.iniScore(STORAGE.parseIni(STORAGE.configBackup))
+    if currentScore > backupScore and currentScore > 0 then
+        return STORAGE.copy(CONFIG_PATH, STORAGE.configBackup)
+    end
+    return false
+end
+
+function STORAGE.mergeBestConfig(target, force)
+    if not force and (tonumber((target.app or {}).stats_reset_at) or 0) > 0 then return false end
+    local best, bestPath, bestScore = nil, '', STORAGE.iniScore(target)
+    local candidates = {
+        CONFIG_PATH,
+        STORAGE.configBackup,
+        STORAGE.configPrevious,
+        STORAGE.configTemp,
+        BACKUP_FILE,
+        STORAGE.legacyDoubleConfig
+    }
+    for _, path in ipairs(candidates) do
+        local candidate = STORAGE.parseIni(path)
+        local score = STORAGE.iniScore(candidate)
+        if score > bestScore then
+            best, bestPath, bestScore = candidate, path, score
+        end
+    end
+    if not best then return false end
+
+    target.stats = target.stats or {}
+    target.rank = target.rank or {}
+    for key, value in pairs(best.stats or {}) do target.stats[key] = value end
+    for key, value in pairs(best.rank or {}) do target.rank[key] = value end
+
+    target.telegram = target.telegram or {}
+    if tostring(target.telegram.token or '') == '' and best.telegram then
+        target.telegram.token = best.telegram.token or target.telegram.token
+        target.telegram.chat_id = best.telegram.chat_id or target.telegram.chat_id
+        target.telegram.enabled = best.telegram.enabled or target.telegram.enabled
+    end
+
+    target.ui = target.ui or {}
+    if best.ui and best.ui.mini ~= nil then target.ui.mini = best.ui.mini end
+
+    STORAGE.recovered = true
+    STORAGE.recoveredSource = bestPath:match('[^\\]+$') or bestPath
+    return true
+end
+
+function STORAGE.historySummary(path)
+    local data = STORAGE.read(path)
+    local result = {
+        rows = 0, salary = 0, deposit = 0, az = 0, tickets = 0,
+        last = nil, size = data and #data or 0
+    }
+    if not data or data == '' then return result end
+
+    local firstLine = true
+    for line in (data .. '\n'):gmatch('(.-)\r?\n') do
+        local isHeader = firstLine and line:find('^timestamp;', 1, false) ~= nil
+        firstLine = false
+        if not isHeader and line ~= '' then
+            local parts = {}
+            for value in (line .. ';'):gmatch('(.-);') do table.insert(parts, value) end
+            if parts[1] and parts[1] ~= '' and parts[12] ~= nil then
+                result.rows = result.rows + 1
+                result.salary = result.salary + (tonumber(parts[2]) or 0)
+                result.deposit = result.deposit + (tonumber(parts[3]) or 0)
+                result.az = result.az + (tonumber(parts[4]) or 0)
+                result.tickets = result.tickets + (tonumber(parts[5]) or 0)
+                result.last = parts
+            end
+        end
+    end
+    return result
+end
+
+function STORAGE.snapshotHistory()
+    local current = STORAGE.historySummary(HISTORY_FILE)
+    local backup = STORAGE.historySummary(STORAGE.historyBackup)
+    if current.rows > backup.rows or (current.rows == backup.rows and current.size > backup.size) then
+        return current.rows > 0 and STORAGE.copy(HISTORY_FILE, STORAGE.historyBackup)
+    end
+    return false
+end
+
+function STORAGE.restoreHistory()
+    local current = STORAGE.historySummary(HISTORY_FILE)
+    local bestPath, best = '', current
+    for _, path in ipairs({ STORAGE.historyBackup, STORAGE.historyPrevious, STORAGE.historyTemp }) do
+        local candidate = STORAGE.historySummary(path)
+        if candidate.rows > best.rows or (candidate.rows == best.rows and candidate.size > best.size) then
+            bestPath, best = path, candidate
+        end
+    end
+    if bestPath ~= '' and best.rows > current.rows and STORAGE.copy(bestPath, HISTORY_FILE) then
+        STORAGE.recovered = true
+        STORAGE.recoveredSource = bestPath:match('[^\\]+$') or bestPath
+        return true
+    end
+    return false
+end
+
+function STORAGE.mergeHistoryStats(target, force)
+    local summary = STORAGE.historySummary(HISTORY_FILE)
+    if summary.rows <= 0 then return false end
+    if not force and (tonumber((target.app or {}).stats_reset_at) or 0) > 0 then return false end
+    local stats = target.stats or {}
+    local currentPaydays = tonumber(stats.paydays) or 0
+    local emptyTotals = currentPaydays <= 0
+        and (tonumber(stats.total_salary) or 0) <= 0
+        and (tonumber(stats.total_deposit) or 0) <= 0
+    if not force and not emptyTotals and summary.rows <= currentPaydays then return false end
+
+    target.stats = stats
+    stats.paydays = math.max(currentPaydays, summary.rows)
+    stats.total_salary = math.max(tonumber(stats.total_salary) or 0, summary.salary)
+    stats.total_deposit = math.max(tonumber(stats.total_deposit) or 0, summary.deposit)
+    stats.total_az = math.max(tonumber(stats.total_az) or 0, summary.az)
+    stats.total_tickets = math.max(tonumber(stats.total_tickets) or 0, summary.tickets)
+    if summary.last and (summary.rows >= currentPaydays or tostring(stats.last_payday or '') == 'Ќет данных') then
+        stats.last_payday = summary.last[1]
+        stats.salary = tonumber(summary.last[2]) or 0
+        stats.deposit_plus = tonumber(summary.last[3]) or 0
+        stats.az_plus = tonumber(summary.last[4]) or 0
+        stats.ticket_plus = tonumber(summary.last[5]) or 0
+        stats.bank = tonumber(summary.last[6]) or 0
+        stats.deposit = tonumber(summary.last[7]) or 0
+        stats.az_balance = tonumber(summary.last[8]) or 0
+        stats.ticket_balance = tonumber(summary.last[9]) or 0
+    end
+    target.app = target.app or {}
+    target.app.stats_reset_at = 0
+    STORAGE.recovered = true
+    STORAGE.recoveredSource = 'ArizonaPaydayHistory.csv'
+    return true
+end
+
+function STORAGE.safeIniSave(data, filename)
+    if filename ~= CONFIG then return STORAGE.rawIniSave(data, filename) end
+    STORAGE.snapshotConfig()
+    if doesFileExist(STORAGE.configTemp) then os.remove(STORAGE.configTemp) end
+
+    local ok = pcall(STORAGE.rawIniSave, data, STORAGE.configTempName)
+    local parsed = ok and STORAGE.parseIni(STORAGE.configTemp) or nil
+    if not parsed or type(parsed.stats) ~= 'table' or type(parsed.rank) ~= 'table' then
+        if doesFileExist(STORAGE.configTemp) then os.remove(STORAGE.configTemp) end
+        print('[Arizona Payday Clean] WARNING: rejected unsafe INI save.')
+        return false
+    end
+
+    if doesFileExist(STORAGE.configPrevious) then os.remove(STORAGE.configPrevious) end
+    if doesFileExist(CONFIG_PATH) and not os.rename(CONFIG_PATH, STORAGE.configPrevious) then
+        os.remove(STORAGE.configTemp)
+        return false
+    end
+    if not os.rename(STORAGE.configTemp, CONFIG_PATH) then
+        if doesFileExist(STORAGE.configPrevious) then os.rename(STORAGE.configPrevious, CONFIG_PATH) end
+        return false
+    end
+    if doesFileExist(STORAGE.configPrevious) then os.remove(STORAGE.configPrevious) end
+    STORAGE.snapshotConfig()
+    return true
+end
+
+inicfg.save = STORAGE.safeIniSave
+
 local CONFIG_EXISTED_BEFORE_V2 = doesFileExist(CONFIG_PATH)
+
+-- —нимок делаетс€ до inicfg.load и до любой миграции: даже если библиотека
+-- не прочитает INI, последн€€ непуста€ верси€ останетс€ восстановимой.
+STORAGE.snapshotConfig()
+STORAGE.snapshotHistory()
 
 local ini = inicfg.load({
     stats = {
@@ -76,7 +332,8 @@ local ini = inicfg.load({
         schema = 2,
         backup_done = false,
         debug = false,
-        history_limit = 50
+        history_limit = 50,
+        stats_reset_at = 0
     },
     afk = {
         enabled = false,
@@ -157,6 +414,7 @@ setDefault(ini.app, 'schema', 2)
 setDefault(ini.app, 'backup_done', false)
 setDefault(ini.app, 'debug', false)
 setDefault(ini.app, 'history_limit', 50)
+setDefault(ini.app, 'stats_reset_at', 0)
 setDefault(ini.afk, 'enabled', false)
 setDefault(ini.afk, 'interval_minutes', 30)
 setDefault(ini.afk, 'grace_minutes', 8)
@@ -172,6 +430,12 @@ setDefault(ini.update, 'pending_digest', '')
 setDefault(ini.update, 'pending_size', 0)
 setDefault(ini.update, 'pending_asset', '')
 setDefault(ini.update, 'last_error', '')
+
+-- ≈сли загрузилс€ пустой/default INI, поднимаем более содержательную копию.
+-- «атем восстанавливаем агрегаты из полного CSV, если сам INI уже обнулилс€.
+STORAGE.restoreHistory()
+STORAGE.mergeBestConfig(ini)
+STORAGE.mergeHistoryStats(ini)
 
 ini.stats.ticket_balance = tonumber(ini.stats.ticket_balance) or 0
 ini.stats.ticket_plus = tonumber(ini.stats.ticket_plus) or 0
@@ -195,6 +459,7 @@ ini.telegram.poll_interval = math.min(10, math.max(2, tonumber(ini.telegram.poll
 ini.app.schema = tonumber(ini.app.schema) or 2
 ini.app.debug = ini.app.debug == true or ini.app.debug == 1 or ini.app.debug == '1' or ini.app.debug == 'true'
 ini.app.history_limit = math.min(500, math.max(10, tonumber(ini.app.history_limit) or 50))
+ini.app.stats_reset_at = math.max(0, tonumber(ini.app.stats_reset_at) or 0)
 ini.afk.enabled = ini.afk.enabled == true or ini.afk.enabled == 1 or ini.afk.enabled == '1' or ini.afk.enabled == 'true'
 ini.afk.interval_minutes = math.max(1, tonumber(ini.afk.interval_minutes) or 30)
 ini.afk.grace_minutes = math.max(1, tonumber(ini.afk.grace_minutes) or 8)
@@ -227,7 +492,7 @@ if not doesDirectoryExist(CONFIG_DIR) then
     createDirectory(CONFIG_DIR)
 end
 
-if not doesFileExist(CONFIG_PATH) then
+if not doesFileExist(CONFIG_PATH) or STORAGE.recovered then
     inicfg.save(ini, CONFIG)
 end
 
@@ -540,6 +805,7 @@ end
 local HISTORY_HEADER = 'timestamp;salary;deposit;az;tickets;bank;deposit_balance;az_balance;ticket_balance;rank;multiplier;total'
 
 local function ensureHistoryFile()
+    STORAGE.restoreHistory()
     if doesFileExist(HISTORY_FILE) then
         local existing = io.open(HISTORY_FILE, 'rb')
         if existing then
@@ -605,6 +871,7 @@ local function appendHistory(record)
         return false
     end
 
+    STORAGE.snapshotHistory()
     local file = io.open(HISTORY_FILE, 'ab')
     if not file then
         debugLog('HISTORY ERROR: cannot open history file')
@@ -628,6 +895,7 @@ local function appendHistory(record)
 
     file:write(table.concat(values, ';'), '\r\n')
     file:close()
+    STORAGE.snapshotHistory()
     refreshHistoryCache()
     return true
 end
@@ -2081,10 +2349,24 @@ local function updateLastHistoryTickets(delta, balance)
             parts[9] = tostring(tonumber(balance) or tonumber(parts[9]) or 0)
             lines[index] = table.concat(parts, ';')
 
-            local output = io.open(HISTORY_FILE, 'wb')
+            STORAGE.snapshotHistory()
+            if doesFileExist(STORAGE.historyTemp) then os.remove(STORAGE.historyTemp) end
+            local output = io.open(STORAGE.historyTemp, 'wb')
             if not output then return false end
             output:write(table.concat(lines, '\r\n'), '\r\n')
             output:close()
+
+            if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
+            if not os.rename(HISTORY_FILE, STORAGE.historyPrevious) then
+                os.remove(STORAGE.historyTemp)
+                return false
+            end
+            if not os.rename(STORAGE.historyTemp, HISTORY_FILE) then
+                os.rename(STORAGE.historyPrevious, HISTORY_FILE)
+                return false
+            end
+            if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
+            STORAGE.snapshotHistory()
             refreshHistoryCache()
             return true
         end
@@ -2508,6 +2790,30 @@ local function paydayHistoryCommand()
     end
 end
 
+local function paydayRecoverCommand()
+    local changed = STORAGE.restoreHistory()
+    if STORAGE.mergeBestConfig(ini, true) then changed = true end
+    if STORAGE.mergeHistoryStats(ini, true) then changed = true end
+
+    if changed then
+        ini.app.stats_reset_at = 0
+        rankNumber[0] = tonumber(ini.rank.number) or 1
+        rankCost[0] = tonumber(ini.rank.cost) or 0
+        rankSalary[0] = tonumber(ini.rank.salary_x1) or 0
+        useDeposit[0] = asBool(ini.rank.use_deposit)
+        setBuffer(rankNumberText, rankNumber[0])
+        setBuffer(rankCostText, rankCost[0])
+        setBuffer(rankSalaryText, rankSalary[0])
+        inicfg.save(ini, CONFIG)
+        refreshHistoryCache()
+        statusText = 'ƒанные восстановлены'
+        sampAddChatMessage('{55DD88}[PayDay Recovery] {FFFFFF}—татистика и истори€ восстановлены. «аписей: '
+            .. tostring(STORAGE.historySummary(HISTORY_FILE).rows) .. '.', -1)
+    else
+        sampAddChatMessage('{FFB84D}[PayDay Recovery] {FFFFFF}ѕодход€ща€ резервна€ копи€ не найдена.', -1)
+    end
+end
+
 local function paydayDebugCommand()
     debugEnabled[0] = not debugEnabled[0]
     ini.app.debug = debugEnabled[0]
@@ -2679,6 +2985,7 @@ local function drawBankTab()
             ini.stats.last_payday = 'Ќет данных'
             ini.stats.last_salary_received = true
             ini.stats.last_payday_partial = false
+            ini.app.stats_reset_at = os.time()
             statsResetConfirmUntil = 0
             inicfg.save(ini, CONFIG)
             statusText = '—татистика сброшена'
@@ -3636,15 +3943,20 @@ function main()
     sampRegisterChatCommand('paytgcommands', telegramRegisterCommandsCommand)
     sampRegisterChatCommand('paystats', paydayStatsCommand)
     sampRegisterChatCommand('payhistory', paydayHistoryCommand)
+    sampRegisterChatCommand('payrecover', paydayRecoverCommand)
     sampRegisterChatCommand('paydebug', paydayDebugCommand)
     sampRegisterChatCommand('paywatch', paydayWatchCommand)
     sampRegisterChatCommand('payafk', paydayWatchCommand) -- старый псевдоним beta-версии
     sampRegisterChatCommand('paymini', paydayMiniCommand)
     sampRegisterChatCommand('payupdate', updater.command)
 
-    print('[Arizona Payday Clean ' .. SCRIPT_VERSION .. '] Main commands: /payday /paytg /paytgtest /paymini /payupdate')
+    print('[Arizona Payday Clean ' .. SCRIPT_VERSION .. '] Main commands: /payday /paytg /paytgtest /paymini /payrecover /payupdate')
 
     sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}¬ерси€ ' .. SCRIPT_VERSION .. ' загружена. Ќастройки сохранены.', -1)
+    if STORAGE.recovered then
+        sampAddChatMessage('{55DD88}[PayDay Recovery] {FFFFFF}—тарые данные восстановлены из '
+            .. tostring(STORAGE.recoveredSource or 'резервной копии') .. '.', -1)
+    end
 
     -- Telegram сохран€ет меню команд на своей стороне. Ќа каждом запуске
     -- повторно регистрировать его не нужно: это задерживало первые сообщени€.
