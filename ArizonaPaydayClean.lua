@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.17'
+local SCRIPT_VERSION = '2.0.18'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -32,6 +32,7 @@ local BACKUP_FILE = CONFIG_DIR .. '\\ArizonaPaydayClean_v1_backup.ini'
 -- на 200 локальных переменных в основном блоке.
 local STORAGE = {
     configBackup = CONFIG_DIR .. '\\ArizonaPaydayClean.backup.ini',
+    configBackupOlder = CONFIG_DIR .. '\\ArizonaPaydayClean.backup.previous.ini',
     configPrevious = CONFIG_DIR .. '\\ArizonaPaydayClean.previous.ini',
     configTemp = CONFIG_DIR .. '\\ArizonaPaydayClean.saving.ini',
     configTempName = 'ArizonaPaydayClean.saving.ini',
@@ -40,6 +41,7 @@ local STORAGE = {
     historyPrevious = CONFIG_DIR .. '\\ArizonaPaydayHistory.previous.csv',
     historyTemp = CONFIG_DIR .. '\\ArizonaPaydayHistory.saving.csv',
     rawIniSave = inicfg.save,
+    startupSnapshotDone = false,
     recovered = false,
     recoveredSource = ''
 }
@@ -90,41 +92,55 @@ function STORAGE.parseIni(path)
     return next(result) and result or nil
 end
 
-function STORAGE.iniScore(config)
-    if type(config) ~= 'table' then return -1 end
+function STORAGE.hasConfigData(config)
+    if type(config) ~= 'table' then return false end
     local stats = type(config.stats) == 'table' and config.stats or {}
     local rank = type(config.rank) == 'table' and config.rank or {}
     local telegram = type(config.telegram) == 'table' and config.telegram or {}
-    local paydays = math.max(0, tonumber(stats.paydays) or 0)
-    local caught = math.max(0, tonumber(rank.caught_paydays) or 0)
-    local flags = 0
     local tracked = {
+        stats.paydays, stats.bank, stats.deposit, stats.az_balance, stats.ticket_balance,
         stats.total_salary, stats.total_deposit, stats.total_az, stats.total_tickets,
-        rank.cost, rank.salary_x1, rank.repaid
+        rank.cost, rank.salary_x1, rank.repaid, rank.caught_paydays
     }
     for _, value in ipairs(tracked) do
-        if (tonumber(value) or 0) > 0 then flags = flags + 1 end
+        if (tonumber(value) or 0) > 0 then return true end
     end
-    if tostring(telegram.token or '') ~= '' then flags = flags + 1 end
-    if tostring(telegram.chat_id or '') ~= '' then flags = flags + 1 end
-    return paydays * 1000000 + caught * 1000 + flags
+    return tostring(telegram.token or '') ~= '' or tostring(telegram.chat_id or '') ~= ''
 end
 
 function STORAGE.snapshotConfig()
-    local currentScore = STORAGE.iniScore(STORAGE.parseIni(CONFIG_PATH))
-    local backupScore = STORAGE.iniScore(STORAGE.parseIni(STORAGE.configBackup))
-    if currentScore > backupScore and currentScore > 0 then
-        return STORAGE.copy(CONFIG_PATH, STORAGE.configBackup)
+    if STORAGE.startupSnapshotDone then return false end
+    STORAGE.startupSnapshotDone = true
+    local current = STORAGE.parseIni(CONFIG_PATH)
+    if not STORAGE.hasConfigData(current) then return false end
+
+    if STORAGE.hasConfigData(STORAGE.parseIni(STORAGE.configBackup)) then
+        STORAGE.copy(STORAGE.configBackup, STORAGE.configBackupOlder)
     end
-    return false
+    return STORAGE.copy(CONFIG_PATH, STORAGE.configBackup)
 end
 
-function STORAGE.mergeBestConfig(target, force)
-    if not force and (tonumber((target.app or {}).stats_reset_at) or 0) > 0 then return false end
-    local best, bestPath, bestScore = nil, '', STORAGE.iniScore(target)
+function STORAGE.bool(value)
+    return value == true or value == 1 or value == '1' or value == 'true'
+end
+
+function STORAGE.timestampValue(value)
+    local day, month, year, hour, minute, second = tostring(value or ''):match(
+        '^(%d%d)%.(%d%d)%.(%d%d%d%d)%s+(%d%d):(%d%d):(%d%d)$'
+    )
+    if not day then return 0 end
+    return os.time({
+        day = tonumber(day), month = tonumber(month), year = tonumber(year),
+        hour = tonumber(hour), min = tonumber(minute), sec = tonumber(second)
+    }) or 0
+end
+
+function STORAGE.configCandidates(target)
+    local result = { { data = target, path = 'текущий INI' } }
     local candidates = {
         CONFIG_PATH,
         STORAGE.configBackup,
+        STORAGE.configBackupOlder,
         STORAGE.configPrevious,
         STORAGE.configTemp,
         BACKUP_FILE,
@@ -132,38 +148,198 @@ function STORAGE.mergeBestConfig(target, force)
     }
     for _, path in ipairs(candidates) do
         local candidate = STORAGE.parseIni(path)
-        local score = STORAGE.iniScore(candidate)
-        if score > bestScore then
-            best, bestPath, bestScore = candidate, path, score
+        if STORAGE.hasConfigData(candidate) then
+            table.insert(result, {
+                data = candidate,
+                path = path:match('[^\\]+$') or path
+            })
         end
     end
-    if not best then return false end
+    return result
+end
 
-    target.stats = target.stats or {}
-    target.rank = target.rank or {}
-    for key, value in pairs(best.stats or {}) do target.stats[key] = value end
-    for key, value in pairs(best.rank or {}) do target.rank[key] = value end
+function STORAGE.rankIdentityMatches(config, rankNumber, rankCost, rankStarted)
+    local rank = type(config.rank) == 'table' and config.rank or {}
+    local number = tonumber(rank.number) or 0
+    local cost = tonumber(rank.cost) or 0
+    local candidateStarted = tostring(rank.started or '')
+    local startedMatches = tostring(rankStarted or '') == '' or tostring(rankStarted) == 'Нет данных'
+        or candidateStarted == '' or candidateStarted == 'Нет данных'
+        or candidateStarted == tostring(rankStarted)
+    return number == rankNumber and cost == rankCost and rankNumber > 0 and rankCost > 0
+        and startedMatches
+end
 
-    target.telegram = target.telegram or {}
-    if tostring(target.telegram.token or '') == '' and best.telegram then
-        target.telegram.token = best.telegram.token or target.telegram.token
-        target.telegram.chat_id = best.telegram.chat_id or target.telegram.chat_id
-        target.telegram.enabled = best.telegram.enabled or target.telegram.enabled
+function STORAGE.projectedRankRepaid(config, history, rankNumber, rankCost, rankStarted)
+    if not STORAGE.rankIdentityMatches(config, rankNumber, rankCost, rankStarted) then return 0 end
+    local rank = config.rank or {}
+    local stats = config.stats or {}
+    local repaid = math.max(0, tonumber(rank.repaid) or 0)
+    local lastPayday = STORAGE.timestampValue(stats.last_payday)
+    local checkpointTime = lastPayday
+
+    for _, row in ipairs((history or {}).records or {}) do
+        if row.rank == rankNumber and row.rankRepaid > repaid
+            and row.timestampValue >= checkpointTime then
+            repaid = row.rankRepaid
+            checkpointTime = row.timestampValue
+        end
     end
 
-    target.ui = target.ui or {}
-    if best.ui and best.ui.mini ~= nil then target.ui.mini = best.ui.mini end
+    -- Проекция нужна только от живого контрольного снимка. Если отсчёт был
+    -- выключен или у снимка нет времени Payday, ничего не додумываем.
+    if STORAGE.bool(rank.tracking) and checkpointTime > 0 and history then
+        local useDeposit = STORAGE.bool(rank.use_deposit)
+        for _, row in ipairs(history.records or {}) do
+            if row.timestampValue > checkpointTime and row.rank == rankNumber then
+                repaid = repaid + row.salary + (useDeposit and row.deposit or 0)
+            end
+        end
+    end
+    return math.min(rankCost, repaid)
+end
 
-    STORAGE.recovered = true
-    STORAGE.recoveredSource = bestPath:match('[^\\]+$') or bestPath
-    return true
+function STORAGE.mergeBestConfig(target, force)
+    target.stats = target.stats or {}
+    target.rank = target.rank or {}
+    target.telegram = target.telegram or {}
+    target.ui = target.ui or {}
+    target.app = target.app or {}
+
+    local statsReset = not force and (tonumber(target.app.stats_reset_at) or 0) > 0
+    local rankReset = not force and (tonumber(target.app.rank_reset_at) or 0) > 0
+    local candidates = STORAGE.configCandidates(target)
+    local changed, sources = false, {}
+
+    local function remember(item)
+        sources[item.path] = true
+    end
+    local function setIfGreater(section, key, value, item)
+        value = tonumber(value) or 0
+        local current = tonumber(section[key]) or 0
+        if value > current then
+            section[key] = value
+            changed = true
+            remember(item)
+        end
+    end
+    local function fillNumber(section, key, value, item)
+        if (tonumber(section[key]) or 0) <= 0 and (tonumber(value) or 0) > 0 then
+            section[key] = tonumber(value)
+            changed = true
+            remember(item)
+        end
+    end
+
+    if not statsReset then
+        for _, item in ipairs(candidates) do
+            local stats = item.data.stats or {}
+            for _, key in ipairs({ 'paydays', 'total_salary', 'total_deposit', 'total_az', 'total_tickets' }) do
+                setIfGreater(target.stats, key, stats[key], item)
+            end
+        end
+    end
+
+    -- Текущий ненулевой баланс всегда важнее старой копии: деньги и AZ можно
+    -- потратить. Резерв используется только когда значение внезапно стало 0.
+    for _, item in ipairs(candidates) do
+        local stats = item.data.stats or {}
+        for _, key in ipairs({ 'bank', 'deposit', 'az_balance', 'ticket_balance' }) do
+            fillNumber(target.stats, key, stats[key], item)
+        end
+    end
+
+    -- Настройки ранга восстанавливаются единым комплектом только когда цена
+    -- исчезла. Иначе номер из дефолта нельзя смешивать с ценой старой копии.
+    if (tonumber(target.rank.cost) or 0) <= 0 then
+        local bestItem, bestRepaid = nil, -1
+        for _, item in ipairs(candidates) do
+            local rank = item.data.rank or {}
+            local cost = tonumber(rank.cost) or 0
+            local repaid = tonumber(rank.repaid) or 0
+            if cost > 0 and repaid > bestRepaid then
+                bestItem, bestRepaid = item, repaid
+            end
+        end
+        if bestItem then
+            local rank = bestItem.data.rank or {}
+            for _, key in ipairs({ 'number', 'cost', 'salary_x1', 'use_deposit', 'tracking',
+                'repaid', 'caught_paydays', 'started', 'completed' }) do
+                if rank[key] ~= nil then target.rank[key] = rank[key] end
+            end
+            changed = true
+            remember(bestItem)
+        end
+    else
+        for _, item in ipairs(candidates) do
+            local rank = item.data.rank or {}
+            if STORAGE.rankIdentityMatches(item.data, tonumber(target.rank.number) or 0,
+                tonumber(target.rank.cost) or 0, target.rank.started) then
+                fillNumber(target.rank, 'salary_x1', rank.salary_x1, item)
+            end
+        end
+    end
+
+    if not rankReset then
+        local rankNumber = tonumber(target.rank.number) or 0
+        local rankCost = tonumber(target.rank.cost) or 0
+        local rankStarted = tostring(target.rank.started or '')
+        local history = STORAGE.historySummary(HISTORY_FILE)
+        for _, item in ipairs(candidates) do
+            if STORAGE.rankIdentityMatches(item.data, rankNumber, rankCost, rankStarted) then
+                local projected = STORAGE.projectedRankRepaid(item.data, history, rankNumber, rankCost, rankStarted)
+                setIfGreater(target.rank, 'repaid', projected, item)
+                setIfGreater(target.rank, 'caught_paydays', (item.data.rank or {}).caught_paydays, item)
+                if tostring(target.rank.started or '') == '' or tostring(target.rank.started) == 'Нет данных' then
+                    local started = tostring((item.data.rank or {}).started or '')
+                    if started ~= '' and started ~= 'Нет данных' then
+                        target.rank.started = started
+                        changed = true
+                        remember(item)
+                    end
+                end
+            end
+        end
+        if rankCost > 0 and (tonumber(target.rank.repaid) or 0) >= rankCost then
+            target.rank.repaid = rankCost
+            target.rank.completed = true
+            target.rank.tracking = false
+        end
+    end
+
+    -- Секреты и переключатели заполняются только если реально исчезли.
+    for _, item in ipairs(candidates) do
+        local telegram = item.data.telegram or {}
+        if tostring(target.telegram.token or '') == '' and tostring(telegram.token or '') ~= '' then
+            target.telegram.token = telegram.token
+            target.telegram.chat_id = telegram.chat_id or target.telegram.chat_id
+            target.telegram.enabled = telegram.enabled
+            changed = true
+            remember(item)
+        end
+        if target.ui.mini == nil and (item.data.ui or {}).mini ~= nil then
+            target.ui.mini = item.data.ui.mini
+            changed = true
+            remember(item)
+        end
+    end
+
+    if changed then
+        local names = {}
+        for name in pairs(sources) do table.insert(names, name) end
+        table.sort(names)
+        STORAGE.recovered = true
+        STORAGE.recoveredSource = table.concat(names, ', ')
+    end
+    return changed
 end
 
 function STORAGE.historySummary(path)
     local data = STORAGE.read(path)
     local result = {
         rows = 0, salary = 0, deposit = 0, az = 0, tickets = 0,
-        last = nil, size = data and #data or 0
+        last = nil, records = {}, size = data and #data or 0,
+        malformed = 0, checkpoints = 0
     }
     if not data or data == '' then return result end
 
@@ -181,16 +357,46 @@ function STORAGE.historySummary(path)
                 result.az = result.az + (tonumber(parts[4]) or 0)
                 result.tickets = result.tickets + (tonumber(parts[5]) or 0)
                 result.last = parts
+                if parts[13] ~= nil and tonumber(parts[13]) ~= nil then
+                    result.checkpoints = result.checkpoints + 1
+                end
+                table.insert(result.records, {
+                    timestamp = parts[1],
+                    timestampValue = STORAGE.timestampValue(parts[1]),
+                    salary = tonumber(parts[2]) or 0,
+                    deposit = tonumber(parts[3]) or 0,
+                    az = tonumber(parts[4]) or 0,
+                    tickets = tonumber(parts[5]) or 0,
+                    rank = tonumber(parts[10]) or 0,
+                    rankRepaid = tonumber(parts[13]) or 0
+                })
+            elseif line ~= '' then
+                result.malformed = result.malformed + 1
             end
         end
     end
     return result
 end
 
+function STORAGE.historyIsBetter(candidate, current)
+    candidate = candidate or {}
+    current = current or {}
+    if (candidate.rows or 0) ~= (current.rows or 0) then
+        return (candidate.rows or 0) > (current.rows or 0)
+    end
+    if (candidate.malformed or 0) ~= (current.malformed or 0) then
+        return (candidate.malformed or 0) < (current.malformed or 0)
+    end
+    if (candidate.checkpoints or 0) ~= (current.checkpoints or 0) then
+        return (candidate.checkpoints or 0) > (current.checkpoints or 0)
+    end
+    return (candidate.size or 0) > (current.size or 0)
+end
+
 function STORAGE.snapshotHistory()
     local current = STORAGE.historySummary(HISTORY_FILE)
     local backup = STORAGE.historySummary(STORAGE.historyBackup)
-    if current.rows > backup.rows or (current.rows == backup.rows and current.size > backup.size) then
+    if STORAGE.historyIsBetter(current, backup) then
         return current.rows > 0 and STORAGE.copy(HISTORY_FILE, STORAGE.historyBackup)
     end
     return false
@@ -201,16 +407,38 @@ function STORAGE.restoreHistory()
     local bestPath, best = '', current
     for _, path in ipairs({ STORAGE.historyBackup, STORAGE.historyPrevious, STORAGE.historyTemp }) do
         local candidate = STORAGE.historySummary(path)
-        if candidate.rows > best.rows or (candidate.rows == best.rows and candidate.size > best.size) then
+        if STORAGE.historyIsBetter(candidate, best) then
             bestPath, best = path, candidate
         end
     end
-    if bestPath ~= '' and best.rows > current.rows and STORAGE.copy(bestPath, HISTORY_FILE) then
+    if bestPath ~= '' and STORAGE.historyIsBetter(best, current)
+        and STORAGE.copy(bestPath, HISTORY_FILE) then
         STORAGE.recovered = true
         STORAGE.recoveredSource = bestPath:match('[^\\]+$') or bestPath
         return true
     end
     return false
+end
+
+function STORAGE.replaceHistory(data)
+    if doesFileExist(STORAGE.historyTemp) then os.remove(STORAGE.historyTemp) end
+    local output = io.open(STORAGE.historyTemp, 'wb')
+    if not output then return false end
+    output:write(tostring(data or ''))
+    output:close()
+
+    if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
+    if doesFileExist(HISTORY_FILE) and not os.rename(HISTORY_FILE, STORAGE.historyPrevious) then
+        os.remove(STORAGE.historyTemp)
+        return false
+    end
+    if not os.rename(STORAGE.historyTemp, HISTORY_FILE) then
+        if doesFileExist(STORAGE.historyPrevious) then os.rename(STORAGE.historyPrevious, HISTORY_FILE) end
+        return false
+    end
+    if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
+    STORAGE.snapshotHistory()
+    return true
 end
 
 function STORAGE.mergeHistoryStats(target, force)
@@ -230,16 +458,37 @@ function STORAGE.mergeHistoryStats(target, force)
     stats.total_deposit = math.max(tonumber(stats.total_deposit) or 0, summary.deposit)
     stats.total_az = math.max(tonumber(stats.total_az) or 0, summary.az)
     stats.total_tickets = math.max(tonumber(stats.total_tickets) or 0, summary.tickets)
-    if summary.last and (summary.rows >= currentPaydays or tostring(stats.last_payday or '') == 'Нет данных') then
-        stats.last_payday = summary.last[1]
-        stats.salary = tonumber(summary.last[2]) or 0
-        stats.deposit_plus = tonumber(summary.last[3]) or 0
-        stats.az_plus = tonumber(summary.last[4]) or 0
-        stats.ticket_plus = tonumber(summary.last[5]) or 0
-        stats.bank = tonumber(summary.last[6]) or 0
-        stats.deposit = tonumber(summary.last[7]) or 0
-        stats.az_balance = tonumber(summary.last[8]) or 0
-        stats.ticket_balance = tonumber(summary.last[9]) or 0
+    if summary.last then
+        local historyTime = STORAGE.timestampValue(summary.last[1])
+        local currentTime = STORAGE.timestampValue(stats.last_payday)
+        local historyIsNewer = historyTime > currentTime
+            or (currentTime <= 0 and historyTime > 0)
+
+        if historyIsNewer then
+            stats.last_payday = summary.last[1]
+            stats.salary = tonumber(summary.last[2]) or 0
+            stats.deposit_plus = tonumber(summary.last[3]) or 0
+            stats.az_plus = tonumber(summary.last[4]) or 0
+            stats.ticket_plus = tonumber(summary.last[5]) or 0
+            stats.bank = tonumber(summary.last[6]) or 0
+            stats.deposit = tonumber(summary.last[7]) or 0
+            stats.az_balance = tonumber(summary.last[8]) or 0
+            stats.ticket_balance = tonumber(summary.last[9]) or 0
+        elseif historyTime == currentTime and historyTime > 0 then
+            -- Одна и та же запись Payday не должна снова затирать уже
+            -- восстановленное значение нулём. CSV заполняет только реально
+            -- пропавшие поля и только ненулевыми данными этой же записи.
+            local samePaydayFields = {
+                salary = 2, deposit_plus = 3, az_plus = 4, ticket_plus = 5,
+                bank = 6, deposit = 7, az_balance = 8, ticket_balance = 9
+            }
+            for key, index in pairs(samePaydayFields) do
+                local value = tonumber(summary.last[index]) or 0
+                if (tonumber(stats[key]) or 0) <= 0 and value > 0 then
+                    stats[key] = value
+                end
+            end
+        end
     end
     target.app = target.app or {}
     target.app.stats_reset_at = 0
@@ -333,7 +582,10 @@ local ini = inicfg.load({
         backup_done = false,
         debug = false,
         history_limit = 50,
-        stats_reset_at = 0
+        stats_reset_at = 0,
+        rank_reset_at = 0,
+        last_payday_signature = '',
+        last_payday_signature_at = 0
     },
     afk = {
         enabled = false,
@@ -415,6 +667,9 @@ setDefault(ini.app, 'backup_done', false)
 setDefault(ini.app, 'debug', false)
 setDefault(ini.app, 'history_limit', 50)
 setDefault(ini.app, 'stats_reset_at', 0)
+setDefault(ini.app, 'rank_reset_at', 0)
+setDefault(ini.app, 'last_payday_signature', '')
+setDefault(ini.app, 'last_payday_signature_at', 0)
 setDefault(ini.afk, 'enabled', false)
 setDefault(ini.afk, 'interval_minutes', 30)
 setDefault(ini.afk, 'grace_minutes', 8)
@@ -460,6 +715,9 @@ ini.app.schema = tonumber(ini.app.schema) or 2
 ini.app.debug = ini.app.debug == true or ini.app.debug == 1 or ini.app.debug == '1' or ini.app.debug == 'true'
 ini.app.history_limit = math.min(500, math.max(10, tonumber(ini.app.history_limit) or 50))
 ini.app.stats_reset_at = math.max(0, tonumber(ini.app.stats_reset_at) or 0)
+ini.app.rank_reset_at = math.max(0, tonumber(ini.app.rank_reset_at) or 0)
+ini.app.last_payday_signature = tostring(ini.app.last_payday_signature or '')
+ini.app.last_payday_signature_at = math.max(0, tonumber(ini.app.last_payday_signature_at) or 0)
 ini.afk.enabled = ini.afk.enabled == true or ini.afk.enabled == 1 or ini.afk.enabled == '1' or ini.afk.enabled == 'true'
 ini.afk.interval_minutes = math.max(1, tonumber(ini.afk.interval_minutes) or 30)
 ini.afk.grace_minutes = math.max(1, tonumber(ini.afk.grace_minutes) or 8)
@@ -582,6 +840,7 @@ local paydayPending = false
 local paydayCaptureStartedAt = 0
 local paydayCaptureUpdatedAt = 0
 local paydayFinalizeAt = 0
+local paydayPreviousStats = nil
 local paydaySignals = {
     bank = false,
     deposit = false,
@@ -802,7 +1061,7 @@ local function historyParts(line)
     return parts
 end
 
-local HISTORY_HEADER = 'timestamp;salary;deposit;az;tickets;bank;deposit_balance;az_balance;ticket_balance;rank;multiplier;total'
+local HISTORY_HEADER = 'timestamp;salary;deposit;az;tickets;bank;deposit_balance;az_balance;ticket_balance;rank;multiplier;total;rank_repaid'
 
 local function ensureHistoryFile()
     STORAGE.restoreHistory()
@@ -811,7 +1070,15 @@ local function ensureHistoryFile()
         if existing then
             local size = existing:seek('end') or 0
             existing:close()
-            if size > 0 then return true end
+            if size > 0 then
+                local data = STORAGE.read(HISTORY_FILE) or ''
+                local firstLine, remainder = data:match('^([^\r\n]*)(.*)$')
+                if firstLine and firstLine:find('^timestamp;', 1, false)
+                    and firstLine ~= HISTORY_HEADER then
+                    STORAGE.replaceHistory(HISTORY_HEADER .. tostring(remainder or ''))
+                end
+                return true
+            end
         end
     end
 
@@ -849,7 +1116,8 @@ local function refreshHistoryCache()
                     ticketBalance = tonumber(p[9]) or 0,
                     rank = tonumber(p[10]) or 1,
                     multiplier = tonumber(p[11]) or 1,
-                    total = tonumber(p[12]) or 0
+                    total = tonumber(p[12]) or 0,
+                    rankRepaid = tonumber(p[13]) or 0
                 }
 
                 table.insert(historyCache, row)
@@ -871,13 +1139,6 @@ local function appendHistory(record)
         return false
     end
 
-    STORAGE.snapshotHistory()
-    local file = io.open(HISTORY_FILE, 'ab')
-    if not file then
-        debugLog('HISTORY ERROR: cannot open history file')
-        return false
-    end
-
     local values = {
         tostring(record.timestamp or ''),
         tostring(record.salary or 0),
@@ -890,12 +1151,19 @@ local function appendHistory(record)
         tostring(record.ticketBalance or 0),
         tostring(record.rank or 1),
         tostring(record.multiplier or 1),
-        tostring(record.total or 0)
+        tostring(record.total or 0),
+        tostring(record.rankRepaid or 0)
     }
 
-    file:write(table.concat(values, ';'), '\r\n')
-    file:close()
     STORAGE.snapshotHistory()
+    local existing = STORAGE.read(HISTORY_FILE) or (HISTORY_HEADER .. '\r\n')
+    if existing ~= '' and not existing:find('[\r\n]$') then
+        existing = existing .. '\r\n'
+    end
+    if not STORAGE.replaceHistory(existing .. table.concat(values, ';') .. '\r\n') then
+        debugLog('HISTORY ERROR: atomic append failed')
+        return false
+    end
     refreshHistoryCache()
     return true
 end
@@ -2293,6 +2561,16 @@ local function beginPaydayCapture(signal)
     local now = os.time()
 
     if not paydayPending then
+        paydayPreviousStats = {
+            bank = ini.stats.bank,
+            bank_plus = ini.stats.bank_plus,
+            deposit = ini.stats.deposit,
+            deposit_plus = ini.stats.deposit_plus,
+            salary = ini.stats.salary,
+            az_balance = ini.stats.az_balance,
+            az_plus = ini.stats.az_plus,
+            ticket_plus = ini.stats.ticket_plus
+        }
         ini.stats.bank_plus = 0
         ini.stats.deposit_plus = 0
         ini.stats.salary = 0
@@ -2318,7 +2596,16 @@ local function beginPaydayCapture(signal)
     schedulePaydayFinalize()
 end
 
+local function restorePaydaySnapshot()
+    if not paydayPreviousStats then return end
+    for key, value in pairs(paydayPreviousStats) do
+        ini.stats[key] = value
+    end
+    paydayPreviousStats = nil
+end
+
 local function resetPaydayCapture(reason)
+    restorePaydaySnapshot()
     paydayPending = false
     paydayCaptureStartedAt = 0
     paydayCaptureUpdatedAt = 0
@@ -2350,23 +2637,9 @@ local function updateLastHistoryTickets(delta, balance)
             lines[index] = table.concat(parts, ';')
 
             STORAGE.snapshotHistory()
-            if doesFileExist(STORAGE.historyTemp) then os.remove(STORAGE.historyTemp) end
-            local output = io.open(STORAGE.historyTemp, 'wb')
-            if not output then return false end
-            output:write(table.concat(lines, '\r\n'), '\r\n')
-            output:close()
-
-            if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
-            if not os.rename(HISTORY_FILE, STORAGE.historyPrevious) then
-                os.remove(STORAGE.historyTemp)
+            if not STORAGE.replaceHistory(table.concat(lines, '\r\n') .. '\r\n') then
                 return false
             end
-            if not os.rename(STORAGE.historyTemp, HISTORY_FILE) then
-                os.rename(STORAGE.historyPrevious, HISTORY_FILE)
-                return false
-            end
-            if doesFileExist(STORAGE.historyPrevious) then os.remove(STORAGE.historyPrevious) end
-            STORAGE.snapshotHistory()
             refreshHistoryCache()
             return true
         end
@@ -2560,11 +2833,33 @@ end
 markPayday = function()
     local now = os.time()
     if now - lastPaydayCatch < 10 then
+        restorePaydaySnapshot()
         debugLog('PAYDAY DUPLICATE SKIPPED')
+        return
+    end
+
+    -- Поздняя повторная строка банковского чека или перезагрузка скрипта не
+    -- должны создавать второй Payday. Балансы образуют устойчивую подпись;
+    -- через две минуты защита снимается задолго до следующего серверного Payday.
+    local signature = table.concat({
+        tostring(tonumber(ini.stats.bank) or 0),
+        tostring(tonumber(ini.stats.deposit) or 0),
+        tostring(tonumber(ini.stats.az_balance) or 0)
+    }, '|')
+    local previousSignature = tostring(ini.app.last_payday_signature or '')
+    local previousSignatureAt = tonumber(ini.app.last_payday_signature_at) or 0
+    if signature == previousSignature and previousSignatureAt > 0
+        and now - previousSignatureAt >= 0 and now - previousSignatureAt <= 120 then
+        restorePaydaySnapshot()
+        lastPaydayCatch = now
+        debugLog('PAYDAY PERSISTENT DUPLICATE SKIPPED: ' .. signature)
         return
     end
     lastPaydayCatch = now
     afkAlertSent = false
+    ini.app.last_payday_signature = signature
+    ini.app.last_payday_signature_at = now
+    paydayPreviousStats = nil
 
     local salary = tonumber(ini.stats.salary) or 0
     local deposit = tonumber(ini.stats.deposit_plus) or 0
@@ -2593,6 +2888,7 @@ markPayday = function()
 
         ini.rank.repaid = (tonumber(ini.rank.repaid) or 0) + incomeForRank
         ini.rank.caught_paydays = (tonumber(ini.rank.caught_paydays) or 0) + 1
+        ini.app.rank_reset_at = 0
 
         local cost = tonumber(ini.rank.cost) or 0
         if cost > 0 and ini.rank.repaid >= cost then
@@ -2627,7 +2923,8 @@ markPayday = function()
         ticketBalance = ini.stats.ticket_balance,
         rank = ini.rank.number,
         multiplier = salaryReceived and st.multiplier or 1,
-        total = salary + deposit
+        total = salary + deposit,
+        rankRepaid = ini.rank.repaid
     })
 
     debugLog('PAYDAY FINALIZED: salary=' .. tostring(salary)
@@ -2797,6 +3094,7 @@ local function paydayRecoverCommand()
 
     if changed then
         ini.app.stats_reset_at = 0
+        ini.app.rank_reset_at = 0
         rankNumber[0] = tonumber(ini.rank.number) or 1
         rankCost[0] = tonumber(ini.rank.cost) or 0
         rankSalary[0] = tonumber(ini.rank.salary_x1) or 0
@@ -3112,6 +3410,7 @@ local function drawRankTab()
                     ini.rank.caught_paydays = 0
                     ini.rank.started = os.date('%d.%m.%Y %H:%M:%S')
                     ini.rank.completed = false
+                    ini.app.rank_reset_at = os.time()
                 end
 
                 ini.rank.tracking = true
@@ -3135,6 +3434,7 @@ local function drawRankTab()
             ini.rank.caught_paydays = 0
             ini.rank.started = 'Нет данных'
             ini.rank.completed = false
+            ini.app.rank_reset_at = os.time()
             rankResetConfirmUntil = 0
             inicfg.save(ini, CONFIG)
             statusText = 'Прогресс сброшен'

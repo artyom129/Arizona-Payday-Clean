@@ -5,7 +5,7 @@
 ### MoonLoader-скрипт для автоматического учёта Payday, доходов и окупаемости ранга на Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.17-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.18-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.17-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/СКАЧАТЬ_ПОСЛЕДНЮЮ_ВЕРСИЮ-2.0.18-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -37,7 +37,7 @@
 | Параметр | Значение |
 |---|---|
 | **Автор** | Artty |
-| **Версия** | 2.0.17 |
+| **Версия** | 2.0.18 |
 | **Платформа** | MoonLoader / SA:MP / Arizona RP |
 | **Распространение** | Бесплатно |
 | **Основной файл** | `ArizonaPaydayClean.lua` |
@@ -157,7 +157,22 @@
 
 ---
 
-## 🆕 Что нового в версии 2.0.17
+## 🆕 Что нового в версии 2.0.18
+
+- исправлен откат окупаемости ранга: резервные INI больше не выбираются целиком по количеству Payday, а объединяются безопасно по отдельным полям;
+- прогресс ранга восстанавливается только из копии того же ранга, цены и запуска отсчёта, затем дополняется более новыми строками истории;
+- исправлен повторный сброс восстановленных талонов в `0` из CSV той же записи Payday;
+- свежие банк, депозит и AZ Coins больше не заменяются устаревшими балансами из резервной копии;
+- история получила контрольное поле `rank_repaid`, поэтому новые записи позволяют восстановить точную окупаемость без повторного начисления;
+- старый 12-колоночный CSV автоматически обновляется до нового формата без удаления строк;
+- запись истории теперь атомарная; оборванный хвост CSV обнаруживается и заменяется целой резервной копией;
+- добавлена вторая ротационная копия `ArizonaPaydayClean.backup.previous.ini`, чтобы не потерять хороший снимок при запуске с уже повреждённым INI;
+- повторная строка банковского чека или быстрая перезагрузка скрипта больше не создаёт второй Payday; при отменённом захвате последние корректные значения возвращаются;
+- `/payrecover` снимает маркеры намеренного сброса только по явной команде пользователя и повторно собирает доступные данные;
+- сценарий из отчёта проверен автоматически: `$27.136.352 + $1.593.789 = $28.730.141`, при этом сохраняются банк `$33.192.181`, депозит `$287.120.176`, `3.843 AZ` и `60` талонов;
+- итоговый CP1251-файл проходит `loadfile()` настоящего LuaJIT; в основном блоке **190** локальных переменных, запас **10** до жёсткого лимита MoonLoader.
+
+## Что вошло в версию 2.0.17
 
 - исправлена потеря накопленной статистики после обновления или повреждённого сохранения INI;
 - перед изменением автоматически создаётся `ArizonaPaydayClean.backup.ini`, причём пустой конфиг не заменяет содержательную копию;

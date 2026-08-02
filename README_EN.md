@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.17-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.18-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.17-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.18-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.17 |
+| **Version** | 2.0.18 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -153,7 +153,22 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 2.0.17
+## 🆕 What Is New in Version 2.0.18
+
+- fixed rank-payback rollback: backup INI files are no longer selected as one snapshot by Payday count and are merged safely field by field;
+- rank progress is recovered only from the same rank number, price, and tracking generation, then advanced with newer history rows;
+- fixed restored ticket balance being overwritten with `0` by the CSV row for the same Payday;
+- current bank, deposit, and AZ Coins balances are no longer replaced by stale backup values;
+- history now stores a `rank_repaid` checkpoint, allowing future exact payback recovery without counting a Payday twice;
+- existing 12-column CSV history is upgraded automatically without removing records;
+- history appends are now atomic, and a torn CSV tail is detected and replaced with a complete backup;
+- added a second rotating `ArizonaPaydayClean.backup.previous.ini` snapshot so a good backup survives startup with an already damaged INI;
+- repeated bank-check lines and quick script reloads no longer create a second Payday; canceled captures restore the last valid values;
+- `/payrecover` clears intentional-reset markers only after an explicit user command and rebuilds all available data;
+- the reported scenario is covered by a regression test: `$27,136,352 + $1,593,789 = $28,730,141`, while bank `$33,192,181`, deposit `$287,120,176`, `3,843 AZ`, and `60` tickets remain intact;
+- the final CP1251 file passes a real LuaJIT `loadfile()` check; the top-level block uses **190** locals, leaving **10** below MoonLoader's hard limit.
+
+## Included in Version 2.0.17
 
 - fixed accumulated statistics being lost after an update or an interrupted INI save;
 - automatically creates `ArizonaPaydayClean.backup.ini` before changes, while an empty config cannot replace a meaningful backup;
