@@ -1,0 +1,77 @@
+name: Publish v2.0.16 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v2.0.16.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify release file
+        shell: bash
+        run: |
+          test "$(sha256sum ArizonaPaydayClean.lua | cut -d ' ' -f 1)" = "df3c9f36d2656b6cf5a83c70604510141b8c0fce643a78afd117d6285e66959a"
+          test "$(wc -c < ArizonaPaydayClean.lua)" = "142252"
+          grep -aFq "local SCRIPT_VERSION = '2.0.16'" ArizonaPaydayClean.lua
+
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/release-v2.0.16.yml
+          git commit -m "Remove temporary v2.0.16 release workflow"
+          git push
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          git tag -f v2.0.16 "$release_sha"
+          git push origin refs/tags/v2.0.16 --force
+
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Arizona Payday Clean v2.0.16 — стабильность для Arizona RP
+
+          Это исправляющий релиз текущей ветки 2.x. Перетаскивание мини-окна не возвращалось: окно остаётся на исходных фиксированных координатах и не принимает ввод.
+
+          ### Исправлено
+
+          - Быстрые последовательные талоны больше не теряются из-за слишком широкого антидубля.
+          - Повтор одного уведомления из чата, GameText, TextDraw или диалога по-прежнему не засчитывается дважды.
+          - Окно антидубля сокращено с 2,5 до 1,2 секунды; дополнительно сравниваются источник, текст и баланс.
+          - Длинные Payday-отчёты и `/paytgtest` делятся между завершёнными строками и доходят через MoonLoader в правильном порядке.
+          - Меню Telegram-бота и `/help` теперь содержат все реально работающие команды.
+          - Все игровые подписи используют фактический номер версии вместо старого `PayDay 2.0`.
+          - Новый номер релиза позволяет встроенному автообновлению увидеть исправления, в отличие от повторной загрузки файла под тем же тегом.
+
+          ### Проверка
+
+          - Финальный файл сохранён в CP1251 для MoonLoader/Arizona RP.
+          - Проверен настоящим LuaJIT 2.1 через `loadfile()`.
+          - В основном блоке 186 локальных переменных из допустимых 200 — запас 14.
+          - SHA-256: `df3c9f36d2656b6cf5a83c70604510141b8c0fce643a78afd117d6285e66959a`.
+
+          ### Установка
+
+          Скачайте только **`ArizonaPaydayClean.lua`** из раздела **Assets** и замените старый файл в папке `moonloader`. Конфигурацию `moonloader/config/ArizonaPaydayClean.ini` удалять не нужно.
+          EOF
+
+          if gh release view v2.0.16 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v2.0.16 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit v2.0.16 --repo "$GITHUB_REPOSITORY" --target "$release_sha" --title "Arizona Payday Clean v2.0.16" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create v2.0.16 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --verify-tag --target "$release_sha" --title "Arizona Payday Clean v2.0.16" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
