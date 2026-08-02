@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](https://github.com/artyom129/Arizona-Payday-Clean)
-[![Version](https://img.shields.io/badge/version-2.0.14-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Version](https://img.shields.io/badge/version-2.0.15-F59E0B?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](https://github.com/artyom129/Arizona-Payday-Clean)
 
@@ -13,7 +13,7 @@
 
 <br>
 
-[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.14-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2.0.15-22C55E?style=for-the-badge&logo=github)](https://github.com/artyom129/Arizona-Payday-Clean/releases/latest)
 
 </div>
 
@@ -36,7 +36,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.14 |
+| **Version** | 2.0.15 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -153,10 +153,18 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🆕 What Is New in Version 2.0.14
+## 🆕 What Is New in Version 2.0.15
+
+- fixed the exact loading error reported by `moonloader.log`: `main function has more than 200 local variables`;
+- reduced top-level local variables from **201 to 194**, below the hard LuaJIT/MoonLoader limit;
+- grouped UI and mini-window settings into tables without changing script behavior;
+- validated the final CP1251 file with a real LuaJIT `loadfile()` compile check;
+- retained the compatible 2.0.14 mini-window movement: `/paymini` shows a native ImGui title bar.
+
+## Included in Version 2.0.14
 
 - removed the custom drag calls introduced in 2.0.13, which could terminate the script on some `mimgui` builds;
-- restored the known-loadable 2.0.12 code path;
+- restored native window movement, but one additional top-level local exceeded LuaJIT's limit; loading is fully fixed in 2.0.15;
 - `/paymini` now shows a standard ImGui title bar, allowing native window movement without additional APIs;
 - `NoDecoration` and `NoInputs` are used only in passive mode, where the overlay must not interfere with gameplay;
 - increased the setup-mode height so the title bar and **Done** button do not overlap the content;

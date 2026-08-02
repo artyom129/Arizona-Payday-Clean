@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.14'
+local SCRIPT_VERSION = '2.0.15'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -345,19 +345,23 @@ local function flags(...)
     return total
 end
 
-local MAIN_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse)
-local PANEL_FLAGS = flags(W.NoScrollbar, W.NoScrollWithMouse)
-local MINI_WIDTH = 300
-local MINI_HEIGHT = 128
-local MINI_MOVE_HEIGHT = 160
+local UI = {
+    mainFlags = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse),
+    panelFlags = flags(W.NoScrollbar, W.NoScrollWithMouse),
+    tokenInputFlags = ((imgui.InputTextFlags or {}).Password or 0)
+}
 -- ¬ обычном режиме это пассивный оверлей без ввода. ¬ режиме перемещени€
 -- NoDecoration снимаетс€: по€вл€етс€ насто€щий заголовок ImGui, который
 -- одинаково перетаскиваетс€ в старых и новых сборках mimgui.
-local MINI_PASSIVE_FLAGS = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoInputs)
-local MINI_MOVE_FLAGS = flags(W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoCollapse)
-local INPUT_FLAGS = imgui.InputTextFlags or {}
-local TOKEN_INPUT_FLAGS = INPUT_FLAGS.Password or 0
-
+-- ¬се параметры собраны в одной таблице, чтобы не превышать жЄсткий лимит
+-- LuaJIT/MoonLoader в 200 локальных переменных на один блок.
+local MINI = {
+    width = 300,
+    height = 128,
+    moveHeight = 160,
+    passiveFlags = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoInputs),
+    moveFlags = flags(W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoCollapse)
+}
 local function clampNumber(value, minValue, maxValue)
     value = tonumber(value) or 0
     if value < minValue then return minValue end
@@ -694,15 +698,15 @@ end
 
 local function defaultMiniPosition()
     local screenWidth, screenHeight = getScreenResolution()
-    local x = math.max(8, screenWidth - MINI_WIDTH - 20)
-    local y = math.min(210, math.max(8, screenHeight - MINI_HEIGHT - 8))
+    local x = math.max(8, screenWidth - MINI.width - 20)
+    local y = math.min(210, math.max(8, screenHeight - MINI.height - 8))
     return x, y
 end
 
 local function clampMiniPosition(x, y)
     local screenWidth, screenHeight = getScreenResolution()
-    local maxX = math.max(8, screenWidth - MINI_WIDTH - 8)
-    local maxY = math.max(8, screenHeight - MINI_HEIGHT - 8)
+    local maxX = math.max(8, screenWidth - MINI.width - 8)
+    local maxY = math.max(8, screenHeight - MINI.height - 8)
     x = clampNumber(x, 8, maxX)
     y = clampNumber(y, 8, maxY)
     return x, y
@@ -2581,7 +2585,7 @@ end
 
 local function beginPanel(id, x, y, w, h)
     imgui.SetCursorPos(imgui.ImVec2(x, y))
-    imgui.BeginChild(id, imgui.ImVec2(w, h), true, PANEL_FLAGS)
+    imgui.BeginChild(id, imgui.ImVec2(w, h), true, UI.panelFlags)
     imgui.SetCursorPos(imgui.ImVec2(16, 12))
 end
 
@@ -2937,7 +2941,7 @@ local function drawTelegramTab()
     textMuted('Bot token')
     imgui.SetCursorPos(imgui.ImVec2(18, 44))
     imgui.PushItemWidth(650)
-    imgui.InputText('##telegram_token', telegramTokenText, ffi.sizeof(telegramTokenText), TOKEN_INPUT_FLAGS)
+    imgui.InputText('##telegram_token', telegramTokenText, ffi.sizeof(telegramTokenText), UI.tokenInputFlags)
     imgui.PopItemWidth()
 
     imgui.SetCursorPos(imgui.ImVec2(18, 92))
@@ -3536,10 +3540,10 @@ end, function()
     if forcePosition then
         imgui.SetNextWindowPos(imgui.ImVec2(miniPosX, miniPosY), imgui.Cond.Always)
     end
-    local miniHeight = miniMoveMode and MINI_MOVE_HEIGHT or MINI_HEIGHT
+    local miniHeight = miniMoveMode and MINI.moveHeight or MINI.height
     local miniTitle = miniMoveMode and u8'ѕеретащи мини-окно##PaydayMiniWindow' or '##PaydayMiniWindow'
-    imgui.SetNextWindowSize(imgui.ImVec2(MINI_WIDTH, miniHeight), imgui.Cond.Always)
-    imgui.Begin(miniTitle, nil, miniMoveMode and MINI_MOVE_FLAGS or MINI_PASSIVE_FLAGS)
+    imgui.SetNextWindowSize(imgui.ImVec2(MINI.width, miniHeight), imgui.Cond.Always)
+    imgui.Begin(miniTitle, nil, miniMoveMode and MINI.moveFlags or MINI.passiveFlags)
 
     local currentPosition = imgui.GetWindowPos()
     if currentPosition then
@@ -3588,7 +3592,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] end, function()
 
     imgui.SetNextWindowPos(imgui.ImVec2(sx / 2, sy / 2), imgui.Cond.Always, imgui.ImVec2(0.5, 0.5))
     imgui.SetNextWindowSize(imgui.ImVec2(winW, winH), imgui.Cond.Always)
-    imgui.Begin('##ArizonaPaydayCleanWindow', window, MAIN_FLAGS)
+    imgui.Begin('##ArizonaPaydayCleanWindow', window, UI.mainFlags)
 
     beginPanel('topbar', 12, 10, 976, 62)
     imgui.SetWindowFontScale(1.22)
