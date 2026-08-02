@@ -1,0 +1,18 @@
+ARIZONA PAYDAY CLEAN v2.0.21
+
+УСТАНОВКА
+
+1. Полностью закрой GTA San Andreas.
+2. Скопируй ArizonaPaydayClean.lua в папку moonloader.
+3. Замени старую версию.
+4. Оставь только один ArizonaPaydayClean.lua.
+5. Не удаляй moonloader/config/ArizonaPaydayClean.ini.
+6. Не удаляй moonloader/config/ArizonaPaydayHistory.csv.
+7. Запусти игру и введи /payday.
+
+GITHUB RELEASE
+
+Тег: v2.0.21
+Название: Arizona Payday Clean v2.0.21
+Asset: ArizonaPaydayClean.lua
+Описание: releases/v2.0.21.md

@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday tracking, income statistics, and rank payback calculation on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/version-2.0.20-F59E0B?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/version-2.0.21-F59E0B?style=for-the-badge)](#)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
 
@@ -34,7 +34,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.20 |
+| **Version** | 2.0.21 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -106,9 +106,18 @@
 
 ---
 
-## ⚡ Version 2.0.20
+## 🚑 Version 2.0.21 hotfix
 
-Version 2.0.20 reduces background CPU usage:
+- robust parsing for the exact bank, deposit, salary, AZ, and ticket lines shown in-game;
+- timestamps and formatting bytes no longer break numeric extraction;
+- a fast partial report is not sent from only one detected value;
+- missing balances are no longer replaced with stale values in Telegram.
+
+---
+
+## ⚡ Performance changes from 2.0.20
+
+Version 2.0.21 reduces background CPU usage:
 
 - the main service loop no longer runs all tasks every rendered frame;
 - approximately 10 ms delay while the window is open;
@@ -172,11 +181,11 @@ Remote gameplay control and remote setting changes are disabled.
 
 ---
 
-## 📦 GitHub Release v2.0.20
+## 📦 GitHub Release v2.0.21
 
 ```text
-Tag: v2.0.20
-Title: Arizona Payday Clean v2.0.20
+Tag: v2.0.21
+Title: Arizona Payday Clean v2.0.21
 Asset: ArizonaPaydayClean.lua
 Size: 178384 bytes
 SHA-256: a6d3565322d9d084376186084614ec94e54aa15a898996f515ea1bdb3bddc453
