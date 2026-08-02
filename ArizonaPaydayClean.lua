@@ -272,11 +272,6 @@ end
 local new = imgui.new
 local window = new.bool(false)
 local miniEnabled = new.bool(asBool(ini.ui.mini))
-local miniMoveMode = false
-local miniPositionInitialized = false
-local miniPositionDirty = false
-local miniPosX = tonumber(ini.ui.mini_x) or -1
-local miniPosY = tonumber(ini.ui.mini_y) or -1
 local useDeposit = new.bool(asBool(ini.rank.use_deposit))
 local debugEnabled = new.bool(asBool(ini.app.debug))
 local afkEnabled = new.bool(asBool(ini.afk.enabled))
@@ -350,17 +345,13 @@ local UI = {
     panelFlags = flags(W.NoScrollbar, W.NoScrollWithMouse),
     tokenInputFlags = ((imgui.InputTextFlags or {}).Password or 0)
 }
--- В обычном режиме это пассивный оверлей без ввода. В режиме перемещения
--- NoDecoration снимается: появляется настоящий заголовок ImGui, который
--- одинаково перетаскивается в старых и новых сборках mimgui.
+-- Мини-окно намеренно закреплено в исходной позиции и не принимает ввод.
 -- Все параметры собраны в одной таблице, чтобы не превышать жёсткий лимит
 -- LuaJIT/MoonLoader в 200 локальных переменных на один блок.
 local MINI = {
     width = 300,
     height = 128,
-    moveHeight = 160,
-    passiveFlags = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoInputs),
-    moveFlags = flags(W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoCollapse)
+    flags = flags(W.NoDecoration, W.NoMove, W.NoResize, W.NoScrollbar, W.NoScrollWithMouse, W.NoSavedSettings, W.NoInputs)
 }
 local function clampNumber(value, minValue, maxValue)
     value = tonumber(value) or 0
@@ -689,10 +680,6 @@ local function saveRankInputs()
     ini.rank.salary_x1 = rankSalary[0]
     ini.rank.use_deposit = useDeposit[0]
     ini.ui.mini = miniEnabled[0]
-    if miniPositionInitialized then
-        ini.ui.mini_x = math.floor(miniPosX + 0.5)
-        ini.ui.mini_y = math.floor(miniPosY + 0.5)
-    end
     inicfg.save(ini, CONFIG)
 end
 
@@ -701,55 +688,6 @@ local function defaultMiniPosition()
     local x = math.max(8, screenWidth - MINI.width - 20)
     local y = math.min(210, math.max(8, screenHeight - MINI.height - 8))
     return x, y
-end
-
-local function clampMiniPosition(x, y)
-    local screenWidth, screenHeight = getScreenResolution()
-    local maxX = math.max(8, screenWidth - MINI.width - 8)
-    local maxY = math.max(8, screenHeight - MINI.height - 8)
-    x = clampNumber(x, 8, maxX)
-    y = clampNumber(y, 8, maxY)
-    return x, y
-end
-
-local function saveMiniPosition()
-    if not miniPositionInitialized then return end
-    miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
-    ini.ui.mini = miniEnabled[0]
-    ini.ui.mini_x = math.floor(miniPosX + 0.5)
-    ini.ui.mini_y = math.floor(miniPosY + 0.5)
-    miniPositionDirty = false
-    inicfg.save(ini, CONFIG)
-end
-
-local function setMiniMoveMode(state)
-    state = state == true
-
-    if state then
-        if window[0] then
-            saveRankInputs()
-        end
-        miniEnabled[0] = true
-        ini.ui.mini = true
-        window[0] = false
-        miniMoveMode = true
-        pcall(function() lockPlayerControl(true) end)
-        statusText = 'Перетащи мини-окно за заголовок и нажми «Готово»'
-        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}Зажми заголовок окна и перетащи его. Для завершения нажми «Готово», ESC или введи /paymini.', -1)
-    else
-        miniMoveMode = false
-        saveMiniPosition()
-        pcall(function() lockPlayerControl(false) end)
-        statusText = 'Позиция мини-окна сохранена'
-    end
-end
-
-local function resetMiniPosition()
-    miniPosX, miniPosY = defaultMiniPosition()
-    miniPositionInitialized = true
-    miniPositionDirty = true
-    saveMiniPosition()
-    statusText = 'Позиция мини-окна сброшена'
 end
 
 local function rankStats()
@@ -2540,9 +2478,6 @@ end
 
 local function setMenuState(state)
     state = state == true
-    if state and miniMoveMode then
-        setMiniMoveMode(false)
-    end
     if window[0] and not state then
         saveRankInputs()
     end
@@ -2559,14 +2494,7 @@ end
 local function paydayMiniCommand(argument)
     local action = tostring(argument or ''):match('^%s*(.-)%s*$'):lower()
 
-    if action == 'reset' then
-        resetMiniPosition()
-        miniEnabled[0] = true
-        ini.ui.mini = true
-        inicfg.save(ini, CONFIG)
-        sampAddChatMessage('{55DD88}[PayDay Mini] {FFFFFF}Позиция мини-окна сброшена.', -1)
-    elseif action == 'off' or action == 'hide' then
-        if miniMoveMode then setMiniMoveMode(false) end
+    if action == 'off' or action == 'hide' then
         miniEnabled[0] = false
         ini.ui.mini = false
         inicfg.save(ini, CONFIG)
@@ -2576,10 +2504,14 @@ local function paydayMiniCommand(argument)
         ini.ui.mini = true
         inicfg.save(ini, CONFIG)
         sampAddChatMessage('{55DD88}[PayDay Mini] {FFFFFF}Мини-окно включено.', -1)
-    elseif action == '' or action == 'move' then
-        setMiniMoveMode(not miniMoveMode)
+    elseif action == '' then
+        miniEnabled[0] = not miniEnabled[0]
+        ini.ui.mini = miniEnabled[0]
+        inicfg.save(ini, CONFIG)
+        local state = miniEnabled[0] and 'включено' or 'выключено'
+        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}Фиксированное мини-окно ' .. state .. '.', -1)
     else
-        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}/paymini — перемещение | /paymini reset | /paymini on | /paymini off', -1)
+        sampAddChatMessage('{FFD34E}[PayDay Mini] {FFFFFF}/paymini — показать/скрыть | /paymini on | /paymini off', -1)
     end
 end
 
@@ -2743,10 +2675,8 @@ local function drawRankTab()
         ini.ui.mini = miniEnabled[0]
         inicfg.save(ini, CONFIG)
     end
-    imgui.SetCursorPos(imgui.ImVec2(470, 116))
-    if imgui.Button(u8'Переместить мини-окно', imgui.ImVec2(205, 30)) then
-        setMiniMoveMode(true)
-    end
+    imgui.SetCursorPos(imgui.ImVec2(470, 124))
+    textMuted('Положение фиксировано')
     endPanel()
 
     -- Для живого расчета читаем буферы, но не пишем INI на каждую цифру.
@@ -3515,49 +3445,16 @@ local miniFrame = imgui.OnFrame(function()
     -- Иначе miniFrame.HideCursor=true и mainFrame.HideCursor=false
     -- каждый кадр спорят между собой, из-за чего курсор мигает при вводе текста.
     return miniEnabled[0] and not window[0]
-        and (miniMoveMode or (st.cost > 0 and st.baseSalary > 0))
+        and st.cost > 0 and st.baseSalary > 0
 end, function()
     local st = rankStats()
-
-    local forcePosition = false
-    if not miniPositionInitialized then
-        if miniPosX < 0 or miniPosY < 0 then
-            miniPosX, miniPosY = defaultMiniPosition()
-        end
-        miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
-        miniPositionInitialized = true
-        miniPositionDirty = true
-        forcePosition = true
-    else
-        local safeX, safeY = clampMiniPosition(miniPosX, miniPosY)
-        if math.abs(safeX - miniPosX) > 0.5 or math.abs(safeY - miniPosY) > 0.5 then
-            miniPosX, miniPosY = safeX, safeY
-            miniPositionDirty = true
-            forcePosition = true
-        end
-    end
-
-    if forcePosition then
-        imgui.SetNextWindowPos(imgui.ImVec2(miniPosX, miniPosY), imgui.Cond.Always)
-    end
-    local miniHeight = miniMoveMode and MINI.moveHeight or MINI.height
-    local miniTitle = miniMoveMode and u8'Перетащи мини-окно##PaydayMiniWindow' or '##PaydayMiniWindow'
-    imgui.SetNextWindowSize(imgui.ImVec2(MINI.width, miniHeight), imgui.Cond.Always)
-    imgui.Begin(miniTitle, nil, miniMoveMode and MINI.moveFlags or MINI.passiveFlags)
-
-    local currentPosition = imgui.GetWindowPos()
-    if currentPosition then
-        local currentX = tonumber(currentPosition.x) or miniPosX
-        local currentY = tonumber(currentPosition.y) or miniPosY
-
-        if math.abs(currentX - miniPosX) > 0.5 or math.abs(currentY - miniPosY) > 0.5 then
-            miniPosX, miniPosY = currentX, currentY
-            miniPositionDirty = true
-        end
-    end
+    local miniX, miniY = defaultMiniPosition()
+    imgui.SetNextWindowPos(imgui.ImVec2(miniX, miniY), imgui.Cond.Always)
+    imgui.SetNextWindowSize(imgui.ImVec2(MINI.width, MINI.height), imgui.Cond.Always)
+    imgui.Begin('##PaydayMiniWindow', nil, MINI.flags)
 
     imgui.SetCursorPos(imgui.ImVec2(14, 10))
-    textValue(miniMoveMode and 'ТЯНИ ЗА ЗАГОЛОВОК СВЕРХУ' or 'PAYDAY RANK', 1)
+    textValue('PAYDAY RANK', 1)
     imgui.SetCursorPos(imgui.ImVec2(246, 10))
     textValue(multiplierText(st.multiplier), 2)
 
@@ -3570,17 +3467,8 @@ end, function()
     imgui.SetCursorPos(imgui.ImVec2(14, 78))
     textMuted('Реально: ' .. tostring(st.remainingReal) .. ' ПД | ' .. money(st.remaining))
 
-    if miniMoveMode then
-        imgui.SetCursorPos(imgui.ImVec2(14, 104))
-        textMuted('Позиция сохранится')
-        imgui.SetCursorPos(imgui.ImVec2(204, 99))
-        if imgui.Button(u8'Готово', imgui.ImVec2(82, 24)) then
-            setMiniMoveMode(false)
-        end
-    else
-        imgui.SetCursorPos(imgui.ImVec2(14, 104))
-        textMuted('/paymini — переместить')
-    end
+    imgui.SetCursorPos(imgui.ImVec2(14, 104))
+    textMuted('/paymini — скрыть')
 
     imgui.End()
 end)
@@ -3712,9 +3600,7 @@ function main()
     while true do
         wait(0)
 
-        -- Явно разводим режимы курсора: мини-окно скрывает его только
-        -- когда главное окно действительно закрыто.
-        miniFrame.HideCursor = not miniMoveMode
+        miniFrame.HideCursor = true
         mainFrame.HideCursor = false
 
         processTelegramTransport()
@@ -3734,14 +3620,7 @@ function main()
             inicfg.save(ini, CONFIG)
         end
 
-        if miniPositionDirty and not miniMoveMode then
-            saveMiniPosition()
-        end
-
-        if miniMoveMode and isKeyJustPressed(0x1B) then
-            setMiniMoveMode(false)
-            wait(150)
-        elseif window[0] and isKeyJustPressed(0x1B) then
+        if window[0] and isKeyJustPressed(0x1B) then
             setMenuState(false)
             wait(150)
         end
@@ -3756,11 +3635,6 @@ function onScriptTerminate(script, quitGame)
             ini.afk.enabled = afkEnabled[0]
             ini.afk.telegram_alerts = afkTelegramAlerts[0]
             ini.telegram.commands_enabled = telegramCommandsEnabled[0]
-            if miniPositionInitialized then
-                miniPosX, miniPosY = clampMiniPosition(miniPosX, miniPosY)
-                ini.ui.mini_x = math.floor(miniPosX + 0.5)
-                ini.ui.mini_y = math.floor(miniPosY + 0.5)
-            end
             ini.ui.mini = miniEnabled[0]
             updater.saveSettings()
             inicfg.save(ini, CONFIG)

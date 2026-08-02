@@ -120,7 +120,7 @@ That is how **Arizona Payday Clean** appeared.
 - optional deposit inclusion;
 - repaid and remaining amounts;
 - Payday and time forecasts;
-- movable in-game mini window with a saved position;
+- fixed-position in-game mini window with payback progress;
 - confirmation before progress reset.
 
 </td>
@@ -159,7 +159,8 @@ That is how **Arizona Payday Clean** appeared.
 - reduced top-level local variables from **201 to 194**, below the hard LuaJIT/MoonLoader limit;
 - grouped UI and mini-window settings into tables without changing script behavior;
 - validated the final CP1251 file with a real LuaJIT `loadfile()` compile check;
-- retained the compatible 2.0.14 mini-window movement: `/paymini` shows a native ImGui title bar.
+- removed mini-window dragging completely at the user's request; the overlay always stays at its original coordinates;
+- `/paymini` now only shows or hides the mini window, with `/paymini on` and `/paymini off` also available.
 
 ## Included in Version 2.0.14
 
@@ -317,8 +318,8 @@ Telegram settings, statistics, and payback progress are preserved.
 | `/payhistory` | Show recent Payday records in game chat |
 | `/paywatch` | Enable or disable missed-Payday monitoring |
 | `/paydebug` | Enable or disable the diagnostic log |
-| `/paymini` | Enable or disable mini-window move mode |
-| `/paymini reset` | Reset the mini window to its default position |
+| `/paymini` | Show or hide the fixed-position mini window |
+| `/paymini on` / `/paymini off` | Enable or disable the mini window |
 | `/payupdate` | Check whether a newer release is available |
 | `/paytg TOKEN CHAT_ID` | Save the Telegram token and chat ID, then enable notifications |
 | `/paytgtest` | Send a complete Telegram preview |
