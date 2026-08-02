@@ -1,0 +1,87 @@
+name: Publish v2.0.18 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v2.0.18.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify release file
+        shell: bash
+        run: |
+          test "$(sha256sum ArizonaPaydayClean.lua | cut -d ' ' -f 1)" = "3a7aadf593083b718251d0b1bc608273b141ee918f1e6648c2076f829da78d20"
+          test "$(wc -c < ArizonaPaydayClean.lua)" = "168344"
+          grep -aFq "local SCRIPT_VERSION = '2.0.18'" ArizonaPaydayClean.lua
+
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/release-v2.0.18.yml
+          git commit -m "Remove temporary v2.0.18 release workflow"
+          git push
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          git tag -f v2.0.18 "$release_sha"
+          git push origin refs/tags/v2.0.18 --force
+
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Arizona Payday Clean v2.0.18 — точное восстановление данных
+
+          Исправлен критичный откат прогресса окупаемости и связанных значений после запуска v2.0.17.
+
+          ### Что исправлено
+
+          - Резервные INI теперь объединяются по отдельным полям, а не выбираются целиком по количеству Payday.
+          - Прогресс берётся только из того же ранга, цены и запуска отсчёта; более новые Payday добавляются из истории.
+          - Талоны больше не сбрасываются обратно в 0 строкой CSV того же Payday.
+          - Свежие банк, депозит и AZ Coins не заменяются старыми балансами.
+          - Новая история хранит контрольное значение окупаемости и обновляет старый CSV без удаления строк.
+          - Запись CSV стала атомарной; оборванный хвост восстанавливается из резервной копии.
+          - Повторная строка банковского чека и быстрая перезагрузка скрипта не создают второй Payday.
+          - Мини-окно остаётся неподвижным на исходных координатах.
+
+          ### Проверенный сценарий
+
+          Для проблемного отчёта результат теперь считается точно:
+
+          - было возвращено: **$27.136.352**;
+          - новый доход: **$1.593.789**;
+          - должно стать: **$28.730.141**;
+          - сохраняются **$33.192.181** в банке, **$287.120.176** на депозите, **3.843 AZ** и **60 талонов**.
+
+          ### Установка и восстановление
+
+          Замените только **ArizonaPaydayClean.lua**. Не удаляйте файлы из **moonloader/config**: именно там находятся INI, история и резервные копии. При первом запуске v2.0.18 восстановление выполняется автоматически. Если нужные значения не вернулись, один раз используйте **/payrecover**.
+
+          ### Проверка сборки
+
+          - Кодировка: **CP1251**
+          - LuaJIT 2.1: **loadfile() OK**
+          - Локальные переменные: **190/200**
+          - SHA-256: **3a7aadf593083b718251d0b1bc608273b141ee918f1e6648c2076f829da78d20**
+          EOF
+
+          if gh release view v2.0.18 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v2.0.18 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit v2.0.18 --repo "$GITHUB_REPOSITORY" --target "$release_sha" --title "Arizona Payday Clean v2.0.18" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create v2.0.18 ArizonaPaydayClean.lua --repo "$GITHUB_REPOSITORY" --verify-tag --target "$release_sha" --title "Arizona Payday Clean v2.0.18" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
