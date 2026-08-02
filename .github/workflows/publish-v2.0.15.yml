@@ -1,0 +1,71 @@
+name: Publish v2.0.15 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-v2.0.15.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify release file
+        shell: bash
+        run: |
+          test "$(sha256sum ArizonaPaydayClean.lua | cut -d ' ' -f 1)" = "61d413c40fbc52e0383b1a5f03afde49a03b2662fb3a4f4f6aac1ca24348673e"
+          grep -aFq "local SCRIPT_VERSION = '2.0.15'" ArizonaPaydayClean.lua
+
+      - name: Remove temporary release workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/publish-v2.0.15.yml
+          git commit -m "Remove temporary v2.0.15 release workflow"
+          git push
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Исправление запуска v2.0.15
+
+          Причина найдена по реальному `moonloader.log` Arizona RP:
+
+          ```text
+          main function has more than 200 local variables
+          ```
+
+          MoonLoader видел файл, но LuaJIT отказывался его компилировать ещё до регистрации игровых команд.
+
+          ### Что исправлено
+
+          - Количество локальных переменных в основном блоке снижено с **201 до 194**.
+          - Настройки интерфейса и мини-окна объединены в таблицы без удаления функций.
+          - Итоговый CP1251-файл успешно проверен настоящим LuaJIT через `loadfile()`.
+          - Сохранён совместимый режим `/paymini` с обычным перетаскиваемым заголовком ImGui.
+
+          ### Установка
+
+          1. Скачайте `ArizonaPaydayClean.lua` из **Assets**.
+          2. Полностью замените старый файл в папке `moonloader`.
+          3. Убедитесь, что в папке осталась только одна версия Arizona Payday Clean.
+
+          `moonloader/config/ArizonaPaydayClean.ini` удалять не нужно: настройки и статистика сохранятся.
+          EOF
+          gh release create v2.0.15 ArizonaPaydayClean.lua \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$release_sha" \
+            --title "Arizona Payday Clean v2.0.15" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
