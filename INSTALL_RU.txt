@@ -1,0 +1,10 @@
+ARIZONA PAYDAY CLEAN v2.0.20
+
+1. Закрой GTA.
+2. Файл ArizonaPaydayClean.lua скопируй в папку moonloader.
+3. Замени старую версию и оставь только один Lua-файл скрипта.
+4. НЕ удаляй moonloader/config/ArizonaPaydayClean.ini.
+5. README устанавливать в игру не требуется.
+6. После запуска используй /payday.
+
+Для проверки нагрузки сверни игру и посмотри CPU в Диспетчере задач.
