@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.20'
+local SCRIPT_VERSION = '2.0.21'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -926,12 +926,17 @@ end
 
 local function stripColors(text)
     local value = tostring(text or '')
+    value = value:gsub('{#%x%x%x%x%x%x%x%x}', '')
+    value = value:gsub('{#%x%x%x%x%x%x}', '')
     value = value:gsub('{%x%x%x%x%x%x%x%x}', '')
     value = value:gsub('{%x%x%x%x%x%x}', '')
     value = value:gsub('~[%w_]+~', '')
-    value = value:gsub('_', ' ')
+    value = value:gsub('<[^>]->', '')
+    value = value:gsub('%c', ' ')
+    value = value:gsub('\194\160', ' ')
     value = value:gsub('\160', ' ')
-    return value
+    value = value:gsub('_', ' ')
+    return value:gsub('%s+', ' '):match('^%s*(.-)%s*$') or ''
 end
 
 local function cleanNumber(value)
@@ -1409,9 +1414,14 @@ local function telegramMessage()
         or 'Payday учтЄн без строки зарплаты'
     local salarySuffix = salaryReceived and '' or '  <i>(не распознана)</i>'
     local bonusText = salaryReceived and multiplierText(st.multiplier) or 'не определЄн'
+    local bankText = paydaySignals.bank and ('<b>' .. money(ini.stats.bank) .. '</b>')
+        or '<i>не распознан</i>'
+    local depositBalanceText = paydaySignals.deposit and ('<b>' .. money(ini.stats.deposit) .. '</b>')
+        or '<i>не распознан</i>'
 
-    local azText = '<b>' .. formatNumber(azBalance) .. '</b>'
-    if azPlus > 0 then
+    local azText = paydaySignals.az and ('<b>' .. formatNumber(azBalance) .. '</b>')
+        or '<i>не распознан</i>'
+    if paydaySignals.az and azPlus > 0 then
         azText = azText .. '  <b>+' .. formatNumber(azPlus) .. ' AZ</b>'
     end
 
@@ -1432,8 +1442,8 @@ local function telegramMessage()
         '<END> »того: <b>' .. money(totalPayday) .. '</b>',
         '',
         '<BANK> <b>ЅјЋјЌ—</b>',
-        '<MID> Ѕанк: <b>' .. money(ini.stats.bank) .. '</b>',
-        '<MID> ƒепозит: <b>' .. money(ini.stats.deposit) .. '</b>',
+        '<MID> Ѕанк: ' .. bankText,
+        '<MID> ƒепозит: ' .. depositBalanceText,
         '<MID> AZ Coins: ' .. azText,
         '<END> “алоны AZ: ' .. ticketText,
         '',
@@ -2700,16 +2710,16 @@ local function updateLastHistoryTickets(delta, balance)
 end
 
 local function parseTicketAmounts(text, nums)
-    local source = stripColors(text):gsub('%s+', ' ')
+    local source = stripColors(text)
     local ticketPattern = '[“т][ја][Ћл][ќо][Ќн]'
-    local coinPattern = '[Aa][Zz]%s*[Cc][Oo][Ii][Nn][Ss]?'
     if not source:match(ticketPattern) then return 0, 0 end
 
-    --  оличество берЄм только после слова Ђ“алонї и символа + перед AZ Coin(s).
-    -- ѕроизвольное первое число строки больше не используетс€.
-    local plusRaw = source:match(ticketPattern .. '.-%+%s*([%d%s%.,]+)%s*' .. coinPattern)
-        or source:match(ticketPattern .. '%s*:%s*[%+xX]%s*([%d%s%.,]+)')
-    local balanceRaw = source:match('%(%s*([%d%s%.,]+)%s*[Ўш][“т]%.?%s*%)')
+    -- ¬ новых сборках перед словом Ђ“алонї и внутри суммы могут встречатьс€
+    -- служебные значки/байты. ѕоэтому прив€зываемс€ к + и цифрам, а не к
+    -- конкретному пробелу или символу валюты.
+    local plusRaw = source:match(ticketPattern .. '.-%+[^%d]*(%d[%d%s%.,]*)')
+        or source:match(ticketPattern .. '.-[xX][^%d]*(%d[%d%s%.,]*)')
+    local balanceRaw = source:match('%([^%d]*(%d[%d%s%.,]*)[^%d]*[Ўш][“т]%.?[^%)]*%)')
         or source:match('[¬в][—с][≈е][√г][ќо][^%d]*([%d%s%.,]+)')
         or source:match('[Ѕб][ја][Ћл][ја][Ќн][—с][^%d]*([%d%s%.,]+)')
 
@@ -2719,13 +2729,15 @@ local function parseTicketAmounts(text, nums)
 end
 
 local function isTicketNotification(text)
-    local source = stripColors(text):gsub('%s+', ' ')
+    local source = stripColors(text)
     local asciiLower = source:lower()
-    local hasTicketWord = source:match('[“т][ја][Ћл][ќо][Ќн]') ~= nil
-    local hasAzWord = asciiLower:match('az%s*coins?') ~= nil
-    local hasAward = source:match('[“т][ја][Ћл][ќо][Ќн].-%+%s*%d') ~= nil
-        or source:match('[“т][ја][Ћл][ќо][Ќн].-[¬в][—с][≈е][√г][ќо]') ~= nil
-        or source:match('[“т][ја][Ћл][ќо][Ќн].-[Ѕб][ја][Ћл][ја][Ќн][—с]') ~= nil
+    local ticketPattern = '[“т][ја][Ћл][ќо][Ќн]'
+    local hasTicketWord = source:match(ticketPattern) ~= nil
+    local hasAzWord = asciiLower:find('az', 1, true) ~= nil
+    local hasAward = source:match(ticketPattern .. '.-%+[^%d]*%d') ~= nil
+        or source:match(ticketPattern .. '.-[xX][^%d]*%d') ~= nil
+        or source:match(ticketPattern .. '.-[¬в][—с][≈е][√г][ќо]') ~= nil
+        or source:match(ticketPattern .. '.-[Ѕб][ја][Ћл][ја][Ќн][—с]') ~= nil
     return hasTicketWord and hasAzWord and hasAward
 end
 
@@ -2820,24 +2832,23 @@ local function tryProcessTicketText(text, sourceName)
     return result == true
 end
 
--- “очные разборщики Payday работают только с частью строки после двоеточи€.
--- Ёто исключает ID, номер ранга и другие числа из названи€ сообщени€.
+-- –азбираем только полезную часть после последнего двоеточи€. Ёто важно,
+-- если клиент добавл€ет [HH:MM:SS] перед серверной строкой. ‘орматирующие
+-- символы между $ и цифрами больше не ломают распознавание.
+function paydaySignals.payload(text)
+    local source = stripColors(text)
+    return source:match('^.*:%s*(.-)%s*$') or source
+end
+
 function paydaySignals.parsePair(text)
-    local source = stripColors(text):gsub('%s+', ' ')
-    local tail = source:match(':%s*(.+)$') or ''
-    local balanceRaw, gainRaw = tail:match('^%s*%$?%s*([%d%s%.,]+).-[(]%s*%+%s*%$?%s*([%d%s%.,]+)')
-    if not balanceRaw then
-        balanceRaw, gainRaw = tail:match('^%s*%$?%s*([%d%s%.,]+).-%+%s*%$?%s*([%d%s%.,]+)')
-    end
-    if not balanceRaw then return nil, nil end
-    return cleanNumber(balanceRaw), gainRaw and cleanNumber(gainRaw) or 0
+    local values = extractNumbers(paydaySignals.payload(text))
+    if #values < 1 then return nil, nil end
+    return values[1], values[2] or 0
 end
 
 function paydaySignals.parseSingle(text)
-    local source = stripColors(text):gsub('%s+', ' ')
-    local tail = source:match(':%s*(.+)$') or ''
-    local raw = tail:match('^%s*%$?%s*([%d%s%.,]+)')
-    return raw and cleanNumber(raw) or nil
+    local values = extractNumbers(paydaySignals.payload(text))
+    return values[1]
 end
 
 -- —трока, пришедша€ сразу после финализации, относитс€ к уже записанному
@@ -2938,10 +2949,17 @@ local function processPaydayCaptureTimeout()
 
     local now = os.time()
 
-    if paydayFinalizeAt > 0 and now >= paydayFinalizeAt and paydayHasEnoughEvidence() then
+    local signalCount = paydaySignalCount()
+    local fastEnough = paydaySignals.salary or signalCount >= 3
+        or (paydaySignals.bank and paydaySignals.deposit)
+
+    -- Ќе отправл€ем быстрый частичный отчЄт только по заголовку и одной строке
+    -- (например, одному AZ). ¬ таком случае ждЄм полное 35-секундное окно.
+    if paydayFinalizeAt > 0 and now >= paydayFinalizeAt
+        and fastEnough and paydayHasEnoughEvidence() then
         paydayPending = false
         paydayCaptureStartedAt = 0
-            paydayFinalizeAt = 0
+        paydayFinalizeAt = 0
         markPayday()
         clearPaydaySignals()
         return
@@ -2951,7 +2969,7 @@ local function processPaydayCaptureTimeout()
         if paydayHasEnoughEvidence() then
             paydayPending = false
             paydayCaptureStartedAt = 0
-                    paydayFinalizeAt = 0
+            paydayFinalizeAt = 0
             markPayday()
             clearPaydaySignals()
         else
@@ -3208,6 +3226,25 @@ local function ticketParserSelfTest()
                 .. '/' .. tostring(detected))
             return false
         end
+    end
+
+    local pairCases = {
+        { '“екуща€ сумма в банке: $ 44.466.721 (+$ 904.545)', 44466721, 904545 },
+        { '[16:30:02] “екуща€ сумма на депозите: $ 295.391.104 (+$ 689.244)', 295391104, 689244 },
+        { 'Ѕаланс на донат-счет: 3915 AZ (+6 AZ)', 3915, 6 }
+    }
+    for index, case in ipairs(pairCases) do
+        local balance, gain = paydaySignals.parsePair(case[1])
+        if balance ~= case[2] or gain ~= case[3] then
+            print('[Arizona Payday Clean] WARNING: Payday pair parser test #' .. tostring(index)
+                .. ' failed: ' .. tostring(balance) .. '/' .. tostring(gain))
+            return false
+        end
+    end
+
+    if paydaySignals.parseSingle('ќбща€ заработна€ плата: $ 904.545') ~= 904545 then
+        print('[Arizona Payday Clean] WARNING: salary parser screenshot test failed')
+        return false
     end
     return true
 end
