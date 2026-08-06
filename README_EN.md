@@ -161,9 +161,17 @@ That is how **Arizona Payday Clean** appeared.
 
 ## 🚑 What is new in version 2.0.25
 
-Version **2.0.25** focuses on two issues: excessive background load and GTA freezing when leaving through `/q`.
+Version **2.0.25** originally focused on two issues: excessive background load and GTA freezing when leaving through `/q`. The current build also includes a targeted financial-parser hotfix.
 
-### Fixed
+### Hotfix: protection against fake chat lines
+
+- player messages in the `Nick_Name[ID]: text` format are rejected before the financial parser runs;
+- VIP, regular, family, and other player chats can no longer imitate bank, deposit, AZ Coins, salary, or ticket lines;
+- a built-in test covers the VIP-chat line `Баланс на донат-счёте: 861958 AZ (+105 AZ)`;
+- genuine system Payday lines continue to use the existing parser logic;
+- Telegram, CSV history, INI data, rank payback, the interface, and `/q` shutdown behavior were not changed by this hotfix.
+
+### Previously fixed in 2.0.25
 
 - the background service loop now runs less frequently:
   - approximately **25 ms** while the main window is open;
@@ -460,13 +468,14 @@ The public `ArizonaPaydayClean.lua` contains no bot token or `chat_id`.
 Tag: v2.0.25
 Title: Arizona Payday Clean v2.0.25
 Asset: ArizonaPaydayClean.lua
+Build: v2.0.25 + player-chat protection hotfix
 ```
 
 Asset verification:
 
 ```text
-Size: 186760 bytes
-SHA-256: eaaccfc83fffabc34b87c076a29690e56f371bd4f082ead2b962ef63e4ebb8ef
+Size: 188856 bytes
+SHA-256: ef475e9a1b24b94fc5fd50fe6596aae10fc1ee5793272cce871c76541b94b2af
 Encoding: CP1251
 ```
 
