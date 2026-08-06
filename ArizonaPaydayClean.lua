@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.25'
+local SCRIPT_VERSION = '2.0.26'
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -16,6 +16,198 @@ local inicfg = require 'inicfg'
 
 local ffi = require 'ffi'
 local dlstatus = require('moonloader').download_status
+
+
+-- Удалённый скриншот вынесен в отдельный нативный помощник. Сам Lua-скрипт
+-- только просит SA:MP сохранить кадр и опрашивает состояние фоновой отправки.
+-- Сетевой POST никогда не выполняется в игровом потоке и не запускает внешние процессы.
+ffi.cdef[[
+typedef unsigned long DWORD;
+typedef long LONG;
+typedef int BOOL;
+typedef void* HANDLE;
+typedef struct _FILETIME {
+    DWORD dwLowDateTime;
+    DWORD dwHighDateTime;
+} FILETIME;
+typedef struct _WIN32_FIND_DATAA {
+    DWORD dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    DWORD nFileSizeHigh;
+    DWORD nFileSizeLow;
+    DWORD dwReserved0;
+    DWORD dwReserved1;
+    char cFileName[260];
+    char cAlternateFileName[14];
+} WIN32_FIND_DATAA;
+HANDLE __stdcall FindFirstFileA(const char* lpFileName, WIN32_FIND_DATAA* lpFindFileData);
+BOOL __stdcall FindNextFileA(HANDLE hFindFile, WIN32_FIND_DATAA* lpFindFileData);
+BOOL __stdcall FindClose(HANDLE hFindFile);
+int __stdcall SHGetFolderPathA(void* hwnd, int csidl, void* token, DWORD flags, char* path);
+
+int __stdcall APC_StartUpload(const char* token, const char* chatId,
+    const char* caption, const char* screenshotPathUtf8);
+int __stdcall APC_GetState(char* errorOut, int capacity);
+void __stdcall APC_Reset(void);
+void __stdcall APC_CancelAll(void);
+]]
+
+local SCREENSHOT = {
+    helper = nil,
+    helperPath = getWorkingDirectory() .. '\\lib\\ArizonaPaydayScreen.dll',
+    helperError = '',
+    shell32 = nil,
+    stage = 'idle',
+    requester = '',
+    baseline = {},
+    detectedPath = '',
+    detectedSize = -1,
+    stableChecks = 0,
+    requestedAt = 0,
+    uploadStartedAt = 0
+}
+
+function SCREENSHOT.loadHelper()
+    if SCREENSHOT.helper then return true end
+    if not doesFileExist(SCREENSHOT.helperPath) then
+        SCREENSHOT.helperError = 'не найден moonloader\\lib\\ArizonaPaydayScreen.dll'
+        return false
+    end
+    local ok, library = pcall(ffi.load, SCREENSHOT.helperPath)
+    if not ok or not library then
+        SCREENSHOT.helperError = 'не удалось загрузить ArizonaPaydayScreen.dll: ' .. tostring(library)
+        return false
+    end
+    SCREENSHOT.helper = library
+    SCREENSHOT.helperError = ''
+    return true
+end
+
+function SCREENSHOT.documentsPath()
+    if SCREENSHOT.shell32 == false then return '' end
+    if not SCREENSHOT.shell32 then
+        local ok, library = pcall(ffi.load, 'shell32')
+        SCREENSHOT.shell32 = ok and library or false
+    end
+    if not SCREENSHOT.shell32 then return '' end
+
+    local buffer = ffi.new('char[260]')
+    local ok, result = pcall(SCREENSHOT.shell32.SHGetFolderPathA, nil, 5, nil, 0, buffer)
+    if ok and result == 0 then return ffi.string(buffer) end
+    return ''
+end
+
+function SCREENSHOT.directories()
+    local result, used = {}, {}
+    local function add(path)
+        path = tostring(path or ''):gsub('[\\/]+$', '')
+        local key = path:lower()
+        if path ~= '' and not used[key] then
+            used[key] = true
+            table.insert(result, path)
+        end
+    end
+
+    local documents = SCREENSHOT.documentsPath()
+    if documents ~= '' then
+        add(documents .. '\\GTA San Andreas User Files\\SAMP\\screens')
+        add(documents .. '\\GTA San Andreas User Files\\SAMP\\screenshots')
+        add(documents .. '\\GTA San Andreas User Files\\screens')
+    end
+
+    local game = getGameDirectory()
+    add(game .. '\\screens')
+    add(game .. '\\SAMP\\screens')
+    add(game .. '\\SAMP\\screenshots')
+    add(getWorkingDirectory() .. '\\screens')
+    return result
+end
+
+function SCREENSHOT.fileStamp(data)
+    local high = tonumber(data.ftLastWriteTime.dwHighDateTime) or 0
+    local low = tonumber(data.ftLastWriteTime.dwLowDateTime) or 0
+    local sizeHigh = tonumber(data.nFileSizeHigh) or 0
+    local sizeLow = tonumber(data.nFileSizeLow) or 0
+    return high * 4294967296 + low, sizeHigh * 4294967296 + sizeLow
+end
+
+function SCREENSHOT.scanFiles()
+    local files = {}
+    local invalid = ffi.cast('HANDLE', -1)
+
+    for _, directory in ipairs(SCREENSHOT.directories()) do
+        local data = ffi.new('WIN32_FIND_DATAA[1]')
+        local handle = ffi.C.FindFirstFileA(directory .. '\\*.*', data)
+        if handle ~= invalid then
+            repeat
+                local name = ffi.string(data[0].cFileName)
+                local lower = name:lower()
+                local isDirectory = bit.band(tonumber(data[0].dwFileAttributes) or 0, 0x10) ~= 0
+                if not isDirectory and lower:match('%.png$') then
+                    local modified, size = SCREENSHOT.fileStamp(data[0])
+                    local path = directory .. '\\' .. name
+                    files[path] = { modified = modified, size = size, signature = tostring(modified) .. ':' .. tostring(size) }
+                end
+            until ffi.C.FindNextFileA(handle, data) == 0
+            ffi.C.FindClose(handle)
+        end
+    end
+    return files
+end
+
+SCREENSHOT.versions = {
+    { signature = {0xF8,0x03,0x6A,0x00,0x40,0x50,0x51,0x8D,0x4C,0x24}, offset = 0x070FC0 },
+    { signature = {0xE8,0x6D,0x9A,0x0A,0x00,0x83,0xC4,0x1C,0x85,0xC0}, offset = 0x074EB0 },
+    { signature = {0x52,0x8D,0x44,0x24,0x0C,0x50,0x8D,0x7E,0x09,0xE8}, offset = 0x075040 },
+    { signature = {0xC0,0x74,0x06,0x88,0x9E,0x34,0x02,0x00,0x00,0x88}, offset = 0x075620 }
+}
+
+function SCREENSHOT.trigger()
+    for _, name in ipairs({'sampTakeScreenshot', 'takeScreenshot'}) do
+        local callback = rawget(_G, name)
+        if type(callback) == 'function' then
+            local ok = pcall(callback)
+            if ok then return true end
+        end
+    end
+
+    local module = getModuleHandle('samp.dll')
+    if not module or module == 0 then return false, 'samp.dll не загружен' end
+
+    local ok, result = pcall(function()
+        local signatureAddress = ffi.cast('const unsigned char*', module + 0xBABE)
+        for _, version in ipairs(SCREENSHOT.versions) do
+            local matches = true
+            for index, byte in ipairs(version.signature) do
+                if tonumber(signatureAddress[index - 1]) ~= byte then
+                    matches = false
+                    break
+                end
+            end
+            if matches then
+                ffi.cast('void (__cdecl*)(void)', module + version.offset)()
+                return true
+            end
+        end
+        return false
+    end)
+
+    if not ok then return false, 'ошибка вызова функции скриншота: ' .. tostring(result) end
+    if result then return true end
+    return false, 'версия SA:MP-клиента не распознана'
+end
+
+function SCREENSHOT.cancel()
+    if SCREENSHOT.helper then pcall(SCREENSHOT.helper.APC_CancelAll) end
+    SCREENSHOT.stage = 'idle'
+    SCREENSHOT.requester = ''
+    SCREENSHOT.baseline = {}
+    SCREENSHOT.detectedPath = ''
+    SCREENSHOT.detectedSize = -1
+    SCREENSHOT.stableChecks = 0
+end
 
 -- Telegram отправляется через встроенный асинхронный загрузчик MoonLoader.
 -- Никаких curl.exe, PowerShell, BAT-файлов и CreateProcessA.
@@ -1599,6 +1791,7 @@ local TELEGRAM_BOT_COMMANDS = {
     { command = 'stats', description = 'All-time stats' },
     { command = 'today', description = 'Today stats' },
     { command = 'history', description = 'Recent Payday history' },
+    { command = 'screen', description = 'Send GTA screenshot' },
     { command = 'rank', description = 'Rank payback' },
     { command = 'watch', description = 'Payday monitor' },
     { command = 'settings', description = 'Current settings' },
@@ -2124,6 +2317,7 @@ local function telegramBotHelpMessage()
         .. string.char(10) .. '/stats — общая статистика'
         .. string.char(10) .. '/today — статистика за сегодня'
         .. string.char(10) .. '/history 5 — последние Payday'
+        .. string.char(10) .. '/screen — прислать скриншот GTA'
         .. string.char(10) .. '/rank — окупаемость ранга'
         .. string.char(10) .. '/watch — контроль пропущенного Payday'
         .. string.char(10) .. '/settings — состояние уведомлений и контроля'
@@ -2277,6 +2471,149 @@ local function telegramReply(chatId, message)
     })
 end
 
+
+function SCREENSHOT.reset()
+    if SCREENSHOT.helper then pcall(SCREENSHOT.helper.APC_Reset) end
+    SCREENSHOT.stage = 'idle'
+    SCREENSHOT.requester = ''
+    SCREENSHOT.baseline = {}
+    SCREENSHOT.detectedPath = ''
+    SCREENSHOT.detectedSize = -1
+    SCREENSHOT.stableChecks = 0
+    SCREENSHOT.requestedAt = 0
+    SCREENSHOT.uploadStartedAt = 0
+end
+
+function SCREENSHOT.request(chatId, announce)
+    chatId = safeTelegramValue(chatId)
+    if UI.shuttingDown then return false end
+    if chatId == '' or not telegramCredentialsReady() then
+        if announce then telegramReply(chatId, '<WARN> <b>Telegram не настроен.</b>') end
+        return false
+    end
+    if SCREENSHOT.stage ~= 'idle' then
+        if announce then telegramReply(chatId, '<TIME> <b>Предыдущий скриншот ещё обрабатывается.</b>') end
+        return false
+    end
+    if not SCREENSHOT.loadHelper() then
+        if announce then
+            telegramReply(chatId, '<WARN> <b>Модуль скриншотов недоступен.</b>'
+                .. string.char(10) .. tostring(SCREENSHOT.helperError))
+        end
+        return false
+    end
+
+    pcall(SCREENSHOT.helper.APC_Reset)
+    SCREENSHOT.baseline = SCREENSHOT.scanFiles()
+    SCREENSHOT.requester = chatId
+    SCREENSHOT.requestedAt = os.time()
+    SCREENSHOT.stage = 'waiting_file'
+    SCREENSHOT.detectedPath = ''
+    SCREENSHOT.detectedSize = -1
+    SCREENSHOT.stableChecks = 0
+
+    local ok, errorText = SCREENSHOT.trigger()
+    if not ok then
+        SCREENSHOT.reset()
+        if announce then
+            telegramReply(chatId, '<WARN> <b>Не удалось сделать скриншот.</b>'
+                .. string.char(10) .. tostring(errorText or 'неизвестная ошибка'))
+        end
+        return false
+    end
+
+    telegramPollPauseUntil = math.max(telegramPollPauseUntil, os.time() + 3)
+    if announce then telegramReply(chatId, '<TIME> <b>Делаю скриншот GTA...</b>') end
+    return true
+end
+
+function SCREENSHOT.process()
+    if UI.shuttingDown or SCREENSHOT.stage == 'idle' then return end
+    local now = os.time()
+
+    if SCREENSHOT.stage == 'waiting_file' then
+        local current = SCREENSHOT.scanFiles()
+        local bestPath, bestMeta = nil, nil
+        for path, meta in pairs(current) do
+            local previous = SCREENSHOT.baseline[path]
+            if not previous or previous.signature ~= meta.signature then
+                if not bestMeta or meta.modified > bestMeta.modified then
+                    bestPath, bestMeta = path, meta
+                end
+            end
+        end
+
+        if bestPath and bestMeta and bestMeta.size > 0 then
+            if SCREENSHOT.detectedPath == bestPath and SCREENSHOT.detectedSize == bestMeta.size then
+                SCREENSHOT.stableChecks = SCREENSHOT.stableChecks + 1
+            else
+                SCREENSHOT.detectedPath = bestPath
+                SCREENSHOT.detectedSize = bestMeta.size
+                SCREENSHOT.stableChecks = 0
+            end
+
+            if SCREENSHOT.stableChecks >= 1 then
+                local caption = 'Arizona RP screenshot | ' .. os.date('%d.%m.%Y %H:%M:%S')
+                local pathUtf8 = u8(SCREENSHOT.detectedPath)
+                local started = SCREENSHOT.helper.APC_StartUpload(
+                    safeTelegramValue(ini.telegram.token),
+                    SCREENSHOT.requester,
+                    caption,
+                    pathUtf8
+                )
+                if started ~= 0 then
+                    SCREENSHOT.stage = 'uploading'
+                    SCREENSHOT.uploadStartedAt = now
+                    telegramPollPauseUntil = math.max(telegramPollPauseUntil, now + 12)
+                else
+                    local requester = SCREENSHOT.requester
+                    SCREENSHOT.reset()
+                    telegramReply(requester, '<WARN> <b>Не удалось запустить отправку скриншота.</b>')
+                end
+            end
+        elseif now - SCREENSHOT.requestedAt >= 12 then
+            local requester = SCREENSHOT.requester
+            SCREENSHOT.reset()
+            telegramReply(requester, '<WARN> <b>Скриншот не появился в папке SA:MP.</b>'
+                .. string.char(10) .. 'Игра могла не создать файл при свёрнутом окне.')
+        end
+        return
+    end
+
+    if SCREENSHOT.stage == 'uploading' then
+        local errorBuffer = ffi.new('char[192]')
+        local ok, state = pcall(SCREENSHOT.helper.APC_GetState, errorBuffer, 192)
+        if not ok then
+            local requester = SCREENSHOT.requester
+            SCREENSHOT.reset()
+            telegramReply(requester, '<WARN> <b>Ошибка модуля отправки скриншота.</b>')
+        elseif state == 2 then
+            SCREENSHOT.reset() -- само фото уже является подтверждением
+        elseif state == -1 then
+            local requester = SCREENSHOT.requester
+            local errorText = ffi.string(errorBuffer)
+            SCREENSHOT.reset()
+            telegramReply(requester, '<WARN> <b>Скриншот не отправлен.</b>'
+                .. string.char(10) .. (errorText ~= '' and errorText or 'Неизвестная ошибка WinHTTP.'))
+        elseif now - SCREENSHOT.uploadStartedAt >= 35 then
+            local requester = SCREENSHOT.requester
+            pcall(SCREENSHOT.helper.APC_CancelAll)
+            SCREENSHOT.reset()
+            telegramReply(requester, '<WARN> <b>Отправка скриншота превысила лимит времени.</b>')
+        end
+    end
+end
+
+function SCREENSHOT.gameCommand()
+    local chatId = safeTelegramValue(ini.telegram.chat_id)
+    if SCREENSHOT.request(chatId, false) then
+        sampAddChatMessage('{55DD88}[PayDay Screen] {FFFFFF}Скриншот создаётся и будет отправлен в Telegram.', -1)
+    else
+        local reason = SCREENSHOT.helperError ~= '' and SCREENSHOT.helperError or 'проверь Telegram и повтори позже'
+        sampAddChatMessage('{FF6666}[PayDay Screen] {FFFFFF}Не удалось начать: ' .. reason, -1)
+    end
+end
+
 local function handleTelegramBotCommand(chatId, text)
     local first, argument = tostring(text or ''):match('^%s*(/%S+)%s*(.-)%s*$')
     if not first then return end
@@ -2291,6 +2628,8 @@ local function handleTelegramBotCommand(chatId, text)
         telegramReply(chatId, telegramBotStatsMessage())
     elseif command == 'today' then
         telegramReply(chatId, telegramBotTodayMessage())
+    elseif command == 'screen' then
+        SCREENSHOT.request(chatId, true)
     elseif command == 'rank' then
         telegramReply(chatId, telegramBotRankMessage())
     elseif command == 'watch' then
@@ -4632,9 +4971,10 @@ function main()
     sampRegisterChatCommand('paywatch', paydayWatchCommand)
     sampRegisterChatCommand('payafk', paydayWatchCommand) -- старый псевдоним beta-версии
     sampRegisterChatCommand('paymini', paydayMiniCommand)
+    sampRegisterChatCommand('payscreen', SCREENSHOT.gameCommand)
     sampRegisterChatCommand('payupdate', updater.command)
 
-    print('[Arizona Payday Clean ' .. SCRIPT_VERSION .. '] Main commands: /payday /paytg /paytgtest /paymini /payrecover /payupdate')
+    print('[Arizona Payday Clean ' .. SCRIPT_VERSION .. '] Main commands: /payday /paytg /paytgtest /payscreen /paymini /payrecover /payupdate')
 
     sampAddChatMessage('{FFD34E}[PayDay ' .. SCRIPT_VERSION .. '] {FFFFFF}Версия ' .. SCRIPT_VERSION .. ' загружена. Настройки сохранены.', -1)
     if STORAGE.recovered then
@@ -4663,6 +5003,7 @@ function main()
 
         processTelegramTransport()
         processTelegramBotPolling()
+        SCREENSHOT.process()
         updater.process()
 
         local now = os.time()
@@ -4725,6 +5066,7 @@ function UI.beginShutdown()
     telegramPollStartedAt = 0
     telegramNextPollAt = math.huge
     telegramPollPauseUntil = math.huge
+    SCREENSHOT.cancel()
     updater.shutdown()
 
     if UI.controlLocked then

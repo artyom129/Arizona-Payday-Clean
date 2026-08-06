@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday, income, and rank payback tracking on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/version-2.0.25-F59E0B?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/version-2.0.26-F59E0B?style=for-the-badge)](#)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
 
@@ -28,6 +28,7 @@
 - tracks bank, deposit, AZ Coins, and AZ Coin tickets;
 - detects the salary multiplier;
 - sends reports and responds to Telegram bot commands;
+- sends a fresh GTA screenshot to Telegram with `/screen`;
 - restores statistics from backups;
 - checks GitHub Releases for updates safely;
 - keeps working while GTA is minimized;
@@ -36,7 +37,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.25 |
+| **Version** | 2.0.26 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -146,11 +147,12 @@ That is how **Arizona Payday Clean** appeared.
 - automatic report after Payday;
 - test message;
 - notification toggle;
-- `/status`, `/stats`, `/today`, `/rank`, `/history`, and other commands;
+- `/status`, `/stats`, `/today`, `/screen`, `/rank`, `/history`, and other commands;
 - access limited to the saved `chat_id`;
 - asynchronous request queue;
 - time-limited polling;
 - stale callback protection;
+- remote GTA screenshot with `/screen`;
 - no `curl.exe`, PowerShell, CMD, or other external processes.
 
 </td>
@@ -159,48 +161,53 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🚑 What is new in version 2.0.25
+## 🚑 What is new in version 2.0.26
 
-Version **2.0.25** originally focused on two issues: excessive background load and GTA freezing when leaving through `/q`. The current build also includes a targeted financial-parser hotfix.
+Version **2.0.26** adds remote GTA screenshots through Telegram without changing the existing Payday accounting flow.
 
-### Hotfix: protection against fake chat lines
+### Added
 
-- player messages in the `Nick_Name[ID]: text` format are rejected before the financial parser runs;
-- VIP, regular, family, and other player chats can no longer imitate bank, deposit, AZ Coins, salary, or ticket lines;
-- a built-in test covers the VIP-chat line `Баланс на донат-счёте: 861958 AZ (+105 AZ)`;
-- genuine system Payday lines continue to use the existing parser logic;
-- Telegram, CSV history, INI data, rank payback, the interface, and `/q` shutdown behavior were not changed by this hotfix.
+- Telegram bot command `/screen` — creates a fresh GTA screenshot and sends it to the saved chat;
+- in-game command `/payscreen` — manually tests the same feature;
+- automatic detection of a new PNG file in standard SA:MP screenshot folders;
+- one screenshot job at a time;
+- clear errors for an unsupported SA:MP build, a missing file, a timeout, or a Telegram failure;
+- `/paytgcommands` now adds `/screen` to the Telegram bot command menu.
 
-### Previously fixed in 2.0.25
+### Isolation and stability
 
-- the background service loop now runs less frequently:
-  - approximately **25 ms** while the main window is open;
-  - approximately **100 ms** while GTA is active;
-  - approximately **500 ms** while GTA is minimized;
-- Telegram `getUpdates` no longer holds a 20-second request;
-- Telegram polling timeout was reduced to **5 seconds**;
-- the default interval between Telegram checks was increased to **10 seconds**;
-- a unified shutdown state was added;
-- when `/q` is used, MoonLoader exits, or the script is terminated:
-  - no new Telegram requests are created;
-  - the Telegram queue is cleared;
-  - stale callbacks are ignored;
-  - the updater is stopped;
-  - player controls are unlocked;
-  - settings are saved once;
-- duplicate configuration saving during shutdown was removed;
-- the interface and background handlers stop after shutdown begins;
-- Payday calculations, history, Telegram reports, and rank payback logic remain unchanged.
+- screenshot creation and photo upload are isolated in `ArizonaPaydayScreen.dll`;
+- photo upload runs separately and does not block the game;
+- existing text delivery, bot polling, and the updater were not rewritten;
+- if the DLL is missing or blocked, only `/screen` is unavailable — Payday tracking, CSV, INI, Telegram reports, rank payback, and UI continue to work;
+- on `/q`, the script requests cancellation and never waits for the network task;
+- `curl.exe`, PowerShell, CMD, BAT files, and `CreateProcessA` are not used;
+- the v2.0.25 financial parser protection against fake player chat messages remains enabled.
 
 > [!IMPORTANT]
-> Telegram bot commands may now arrive with a delay of approximately 15 seconds. This is intentional and reduces background load while making GTA shutdown safer.
+> `/screen` requires **both files**: `moonloader/ArizonaPaydayClean.lua` and `moonloader/lib/ArizonaPaydayScreen.dll`. Installing only the Lua file does not break the core script, but screenshot delivery will be unavailable.
 
 > [!NOTE]
-> MoonLoader cannot forcibly cancel every download that has already started. The script marks such a request as stale, does not start another one, and ignores its callback after shutdown begins.
+> Some GTA/SA:MP builds cannot create a screenshot while the window is fully minimized or the graphics device is lost. In that case the bot returns an error and statistics remain unchanged.
 
 ---
 
 ## 🕘 Previous version highlights
+
+<details>
+<summary><strong>Version 2.0.25 — stability, /q shutdown, and chat protection</strong></summary>
+
+<br>
+
+- reduced background workload while the game is active or minimized;
+- shorter Telegram polling timeouts and a lower polling frequency;
+- one safe shutdown path for `/q` and MoonLoader termination;
+- new requests stop, queues are cleared, and settings are saved during shutdown;
+- duplicate configuration saves were removed;
+- player messages matching `Nick_Name[ID]: text` can no longer fake bank, deposit, AZ Coins, salary, or ticket lines;
+- genuine system Payday lines still use the previous parser logic.
+
+</details>
 
 <details>
 <summary><strong>Version 2.0.21 — Payday parser</strong></summary>
@@ -260,37 +267,42 @@ A Payday notification may include:
 ### Requirements
 
 - GTA San Andreas;
-- SA:MP or a compatible Arizona RP build;
+- SA:MP or a compatible Arizona RP client;
 - MoonLoader;
 - `mimgui`;
 - `lib.samp.events`;
 - `inicfg`;
-- standard MoonLoader libraries.
+- standard MoonLoader libraries;
 
 ### Install or update
 
-1. Close GTA completely.
-2. Download `ArizonaPaydayClean.lua` from **Releases**.
-3. Make sure there is no second copy of the script in the `moonloader` directory.
-4. Replace the previous file:
+1. Fully close GTA.
+2. Open the complete v2.0.26 archive.
+3. Copy:
 
 ```text
-moonloader/ArizonaPaydayClean.lua
+ArizonaPaydayClean.lua → moonloader/ArizonaPaydayClean.lua
 ```
 
-5. Do not delete:
+4. Copy the screenshot module:
+
+```text
+lib/ArizonaPaydayScreen.dll → moonloader/lib/ArizonaPaydayScreen.dll
+```
+
+5. Keep only one active `ArizonaPaydayClean.lua` in `moonloader`.
+6. Do not delete:
 
 ```text
 moonloader/config/ArizonaPaydayClean.ini
 moonloader/config/ArizonaPaydayHistory.csv
 ```
 
-6. Start the game.
-7. Enter:
+7. Start the game and verify the core script with `/payday`.
+8. Test the new feature with `/payscreen`, then send `/screen` to the Telegram bot.
 
-```text
-/payday
-```
+> [!IMPORTANT]
+> The built-in `/payupdate` updates the Lua file. Install `ArizonaPaydayScreen.dll` manually at least once from the complete v2.0.26 archive.
 
 > [!CAUTION]
 > Two copies of the script may process the same Payday, duplicate Telegram reports, and increase CPU usage.
@@ -310,6 +322,7 @@ moonloader/config/ArizonaPaydayHistory.csv
 | `/paywatch` | Toggle missed-Payday monitoring |
 | `/paymini` | Show or hide the mini overlay |
 | `/paymini on` / `/paymini off` | Set the mini-overlay state explicitly |
+| `/payscreen` | Create a GTA screenshot and send it to the configured Telegram chat |
 | `/paytg TOKEN CHAT_ID` | Save the Telegram token and chat ID |
 | `/paytgtest` | Send a test report |
 | `/paytgon` | Enable Telegram notifications |
@@ -344,6 +357,7 @@ A group or channel `chat_id` may be negative:
 | `/status` / `/ping` | Game, Payday, and server activity status |
 | `/stats` | Total statistics |
 | `/today` | Statistics for the current date |
+| `/screen` | Create a fresh GTA screenshot and send it to the chat |
 | `/rank` | Rank payback |
 | `/history N` | Recent Payday records |
 | `/watch` | Missed-Payday monitor status |
@@ -399,11 +413,17 @@ The script does not launch:
 - BAT files;
 - `CreateProcessA`.
 
-Telegram and update downloads use MoonLoader's asynchronous downloader:
+Text Telegram messages and updates still use MoonLoader's built-in asynchronous downloader:
 
 ```lua
 downloadUrlToFile(...)
 ```
+
+`ArizonaPaydayScreen.dll` handles photo delivery. It is stored in the `lib` folder and only needs to be installed once with the update.
+
+### Isolated screenshot module
+
+The module does not store the bot token or `chat_id`; it receives them only for one upload job. A missing DLL, load failure, or rejected photo changes only the current `/screen` request and never modifies financial statistics.
 
 ### Duplicate protection
 
@@ -415,7 +435,7 @@ Values that may exceed a standard 32-bit `InputInt` range are entered as text an
 
 ### Safe shutdown
 
-Version 2.0.25 handles multiple MoonLoader termination events. Once shutdown begins, the script closes the menu, stops background work, unlocks controls, and saves the current state without duplicate writes.
+Version 2.0.26 handles multiple MoonLoader termination events. Once shutdown begins, the script closes the menu, stops new requests, cancels the screenshot job without waiting, unlocks controls, and saves the current state without duplicate writes.
 
 ---
 
@@ -430,6 +450,7 @@ When opening an **Issue**, include:
 - whether GTA was minimized;
 - whether anti-AFK was enabled;
 - whether Telegram notifications and bot commands were enabled;
+- whether `/screen` was used and a new PNG appeared in the SA:MP folder;
 - which other MoonLoader scripts were running;
 - the latest lines from `moonloader.log`;
 - an example of a server message parsed incorrectly.
@@ -462,24 +483,29 @@ The public `ArizonaPaydayClean.lua` contains no bot token or `chat_id`.
 
 ---
 
-## 📦 GitHub Release v2.0.25
+## 📦 GitHub Release v2.0.26
 
 ```text
-Tag: v2.0.25
-Title: Arizona Payday Clean v2.0.25
-Asset: ArizonaPaydayClean.lua
-Build: v2.0.25 + player-chat protection hotfix
+Tag: v2.0.26
+Name: Arizona Payday Clean v2.0.26 — Telegram Screenshot
+Main file: ArizonaPaydayClean.lua
+Module: lib/ArizonaPaydayScreen.dll
+Ready archive: ArizonaPaydayClean-v2.0.26.zip
 ```
 
-Asset verification:
+File verification:
 
 ```text
-Size: 188856 bytes
-SHA-256: ef475e9a1b24b94fc5fd50fe6596aae10fc1ee5793272cce871c76541b94b2af
+ArizonaPaydayClean.lua
+Size: 201861 bytes
+SHA-256: 95cde9866b0780f65d7e65c3c176ab130bdc9dedeca0485fb2323ab823469184
 Encoding: CP1251
+
+ArizonaPaydayScreen.dll
+Size: 10240 bytes
+SHA-256: 5c3186cf2d5fc30c8de6e2ac6eaf6897b5eb7010bb58c603d86f63d6d0af0c87
 ```
 
-The ready-to-paste release description is available in `releases/v2.0.25.md`.
 
 ---
 
