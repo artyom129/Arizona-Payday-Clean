@@ -1,4 +1,6 @@
-local SCRIPT_VERSION = '2.0.26'
+local SCRIPT_VERSION = '2.0.27'
+
+-- 2.0.27 RC: watchdog startup fix + conservative stability audit.
 
 script_name('Arizona Payday Clean')
 script_author('Artty')
@@ -289,10 +291,15 @@ function STORAGE.hasConfigData(config)
     local stats = type(config.stats) == 'table' and config.stats or {}
     local rank = type(config.rank) == 'table' and config.rank or {}
     local telegram = type(config.telegram) == 'table' and config.telegram or {}
+    -- `ipairs` останавливается на первом nil. В частично повреждённом INI
+    -- отдельное поле может отсутствовать, хотя остальные данные ещё целы.
     local tracked = {
-        stats.paydays, stats.bank, stats.deposit, stats.az_balance, stats.ticket_balance,
-        stats.total_salary, stats.total_deposit, stats.total_az, stats.total_tickets,
-        rank.cost, rank.salary_x1, rank.repaid, rank.caught_paydays
+        stats.paydays or 0, stats.bank or 0, stats.deposit or 0,
+        stats.az_balance or 0, stats.ticket_balance or 0,
+        stats.total_salary or 0, stats.total_deposit or 0,
+        stats.total_az or 0, stats.total_tickets or 0,
+        rank.cost or 0, rank.salary_x1 or 0, rank.repaid or 0,
+        rank.caught_paydays or 0
     }
     for _, value in ipairs(tracked) do
         if (tonumber(value) or 0) > 0 then return true end
@@ -547,12 +554,14 @@ function STORAGE.historySummary(path)
 
     local firstLine = true
     for line in (data .. '\n'):gmatch('(.-)\r?\n') do
+        line = tostring(line or ''):gsub('\r+$', '')
         local isHeader = firstLine and line:find('^timestamp;', 1, false) ~= nil
         firstLine = false
         if not isHeader and line ~= '' then
             local parts = {}
             for value in (line .. ';'):gmatch('(.-);') do table.insert(parts, value) end
-            if parts[1] and parts[1] ~= '' and parts[12] ~= nil then
+            local timestampValue = STORAGE.timestampValue(parts[1])
+            if timestampValue > 0 and parts[12] ~= nil then
                 result.rows = result.rows + 1
                 result.salary = result.salary + (tonumber(parts[2]) or 0)
                 result.deposit = result.deposit + (tonumber(parts[3]) or 0)
@@ -564,7 +573,7 @@ function STORAGE.historySummary(path)
                 end
                 table.insert(result.records, {
                     timestamp = parts[1],
-                    timestampValue = STORAGE.timestampValue(parts[1]),
+                    timestampValue = timestampValue,
                     salary = tonumber(parts[2]) or 0,
                     deposit = tonumber(parts[3]) or 0,
                     az = tonumber(parts[4]) or 0,
@@ -1009,7 +1018,8 @@ local session = {
     salary = 0,
     deposit = 0,
     az = 0,
-    tickets = 0
+    tickets = 0,
+    paydaySeen = false
 }
 
 local historyCache = {}
@@ -1298,7 +1308,8 @@ end
 
 local function historyParts(line)
     local parts = {}
-    for value in (tostring(line or '') .. ';'):gmatch('(.-);') do
+    line = tostring(line or ''):gsub('\r+$', '')
+    for value in (line .. ';'):gmatch('(.-);') do
         table.insert(parts, value)
     end
     return parts
@@ -1346,7 +1357,7 @@ local function refreshHistoryCache()
 
         if not isHeader and line ~= '' then
             local p = historyParts(line)
-            if p[1] and p[1] ~= '' and p[2] ~= nil and p[12] ~= nil then
+            if STORAGE.timestampValue(p[1]) > 0 and p[2] ~= nil and p[12] ~= nil then
                 local row = {
                     timestamp = p[1],
                     salary = tonumber(p[2]) or 0,
@@ -1468,12 +1479,18 @@ local function defaultMiniPosition()
     return x, y
 end
 
-local function rankStats()
-    local cost = tonumber(ini.rank.cost) or 0
-    local baseSalary = tonumber(ini.rank.salary_x1) or 0
+local function rankStats(preview)
+    preview = type(preview) == 'table' and preview or {}
+    local cost = preview.cost ~= nil and (tonumber(preview.cost) or 0)
+        or (tonumber(ini.rank.cost) or 0)
+    local baseSalary = preview.baseSalary ~= nil and (tonumber(preview.baseSalary) or 0)
+        or (tonumber(ini.rank.salary_x1) or 0)
     local realSalary = tonumber(ini.stats.salary) or 0
     local salaryReceived = asBool(ini.stats.last_salary_received)
-    local deposit = asBool(ini.rank.use_deposit) and (tonumber(ini.stats.deposit_plus) or 0) or 0
+    local previewUseDeposit = preview.useDeposit
+    local useDepositForCalc = previewUseDeposit ~= nil and previewUseDeposit == true
+        or (previewUseDeposit == nil and asBool(ini.rank.use_deposit))
+    local deposit = useDepositForCalc and (tonumber(ini.stats.deposit_plus) or 0) or 0
 
     -- Для прогноза сохраняем старое безопасное поведение: если строка зарплаты
     -- не пришла, используем x1. Фактически полученная зарплата при этом остаётся 0.
@@ -1704,6 +1721,7 @@ end
 
 local telegramQueue = {}
 local telegramBusy = false
+local telegramPollBusy = false -- forward declaration: shared transport lock
 local telegramFinished = nil
 local telegramStartedAt = 0
 local telegramCurrent = nil
@@ -2108,7 +2126,9 @@ local function processTelegramTransport()
         finishTelegramRequest(false, 'request timeout')
     end
 
-    if telegramBusy or #telegramQueue == 0 then
+    -- Один сетевой запрос MoonLoader за раз: параллельный sendMessage во
+    -- время getUpdates раньше мог создавать лишнюю нагрузку и гонки callback'ов.
+    if telegramBusy or telegramPollBusy or #telegramQueue == 0 then
         return
     end
 
@@ -2284,7 +2304,6 @@ local function queueTelegramCommandRegistration(showResult)
     return true
 end
 
-local telegramPollBusy = false
 local telegramPollFinished = nil
 local telegramPollStartedAt = 0
 local telegramPollRequestNumber = 0
@@ -2430,11 +2449,18 @@ local function telegramBotHistoryMessage(limit)
     return table.concat(lines, string.char(10))
 end
 
+-- Контроль пропущенного Payday работает только по Payday текущего запуска.
+-- Исторический ini.stats.last_payday нужен для статистики, но не должен
+-- вызывать тревогу сразу после входа в игру.
+local function hasCurrentSessionPayday()
+    return session.paydaySeen == true
+end
+
 local function telegramBotWatchMessage()
     local state
     if not afkEnabled[0] then
         state = 'Контроль выключен'
-    elseif lastPaydayCatch <= 0 then
+    elseif not hasCurrentSessionPayday() then
         state = 'Жду первый Payday'
     else
         local remaining = ((tonumber(ini.afk.interval_minutes) or 30)
@@ -2813,7 +2839,7 @@ local function afkStatusText()
         return 'Контроль выключен'
     end
 
-    if lastPaydayCatch <= 0 then
+    if not hasCurrentSessionPayday() then
         return 'Жду первый Payday'
     end
 
@@ -2845,7 +2871,7 @@ local function afkAlertMessage()
 end
 
 local function processAfkWatchdog()
-    if not afkEnabled[0] or lastPaydayCatch <= 0 or afkAlertSent
+    if not afkEnabled[0] or not hasCurrentSessionPayday() or afkAlertSent
         or os.time() - session.startedAt < 60 then
         return
     end
@@ -3079,7 +3105,9 @@ local function updateLastHistoryTickets(delta, balance)
     if not file then return false end
 
     local lines = {}
-    for line in file:lines() do table.insert(lines, line) end
+    for line in file:lines() do
+        table.insert(lines, (tostring(line or ''):gsub('\r+$', '')))
+    end
     file:close()
 
     for index = #lines, 2, -1 do
@@ -3200,7 +3228,8 @@ local function processTicketLine(text, nums, sourceName)
         ticketDedupe.captureGain = (tonumber(ticketDedupe.captureGain) or 0) + plus
         ticketDedupe.captureAt = now
         schedulePaydayFinalize()
-    elseif lastPaydayCatch > 0 and now - lastPaydayCatch <= 20 then
+    elseif lastPaydayCatch > 0 and now - lastPaydayCatch >= 0
+        and now - lastPaydayCatch <= 20 then
         ini.stats.ticket_plus = (tonumber(ini.stats.ticket_plus) or 0) + plus
         updateLastHistoryTickets(plus, ini.stats.ticket_balance)
     else
@@ -3292,12 +3321,15 @@ end
 -- агрегаты только на фактическую разницу.
 function paydaySignals.mergeLate(kind, balance, gain)
     local now = os.time()
-    if paydayPending or lastPaydayCatch <= 0 or now - lastPaydayCatch > 25 then return false end
+    local lastAge = now - lastPaydayCatch
+    if paydayPending or lastPaydayCatch <= 0 or lastAge < 0 or lastAge > 25 then return false end
 
     local file = io.open(HISTORY_FILE, 'rb')
     local lines = {}
     if file then
-        for line in file:lines() do table.insert(lines, line) end
+        for line in file:lines() do
+            table.insert(lines, (tostring(line or ''):gsub('\r+$', '')))
+        end
         file:close()
     end
 
@@ -3422,7 +3454,8 @@ end
 
 markPayday = function()
     local now = os.time()
-    if now - lastPaydayCatch < 10 then
+    local lastAge = now - lastPaydayCatch
+    if lastPaydayCatch > 0 and lastAge >= 0 and lastAge < 10 then
         restorePaydaySnapshot()
         debugLog('PAYDAY DUPLICATE SKIPPED')
         return
@@ -3444,6 +3477,7 @@ markPayday = function()
         return
     end
     lastPaydayCatch = now
+    session.paydaySeen = true
     afkAlertSent = false
     ini.app.last_payday_signature = signature
     ini.app.last_payday_signature_at = now
@@ -3618,7 +3652,8 @@ function sampev.onServerMessage(color, text)
     if isTicketLine then tryProcessTicketText(text, 'server_message') end
 
     if isPaydayMarker then
-        if lastPaydayCatch > 0 and os.time() - lastPaydayCatch <= 25 then
+        local markerAge = os.time() - lastPaydayCatch
+        if lastPaydayCatch > 0 and markerAge >= 0 and markerAge <= 25 then
             debugLog('LATE PAYDAY MARKER IGNORED')
         else
             beginPaydayCapture('marker')
@@ -4040,13 +4075,14 @@ local function drawRankTab()
     textMuted('Положение фиксировано')
     endPanel()
 
-    -- Для живого расчета читаем буферы, но не пишем INI на каждую цифру.
+    -- Для живого расчёта используем введённые значения только как предпросмотр.
+    -- До «Сохранить» они не влияют на активный счётчик и следующий Payday.
     syncRankValuesFromText()
-    ini.rank.number = rankNumber[0]
-    ini.rank.cost = rankCost[0]
-    ini.rank.salary_x1 = rankSalary[0]
-
-    local st = rankStats()
+    local st = rankStats({
+        cost = rankCost[0],
+        baseSalary = rankSalary[0],
+        useDeposit = useDeposit[0]
+    })
 
     beginPanel('rank_now_panel', 260, 330, 700, 122)
     textMuted('ТЕКУЩИЙ РАСЧЕТ ЗАРПЛАТЫ')
