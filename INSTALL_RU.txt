@@ -1,15 +1,35 @@
-ARIZONA PAYDAY CLEAN v2.0.26
+ARIZONA PAYDAY CLEAN v2.0.27
 
-УСТАНОВКА
+УСТАНОВКА / ОБНОВЛЕНИЕ
 
 1. Полностью закрой GTA San Andreas.
-2. Скопируй ArizonaPaydayClean.lua в папку moonloader с заменой старого файла.
-3. Скопируй lib\ArizonaPaydayScreen.dll в moonloader\lib\ArizonaPaydayScreen.dll.
-4. Оставь только один ArizonaPaydayClean.lua в папке moonloader.
-5. Не удаляй moonloader\config\ArizonaPaydayClean.ini.
-6. Не удаляй moonloader\config\ArizonaPaydayHistory.csv.
+2. Сделай резервную копию старого ArizonaPaydayClean.lua.
+3. Скопируй ArizonaPaydayClean.lua в папку moonloader с заменой старого файла.
+4. Если ArizonaPaydayScreen.dll ещё не установлен, скопируй:
+   lib\ArizonaPaydayScreen.dll -> moonloader\lib\ArizonaPaydayScreen.dll
+5. Оставь только один ArizonaPaydayClean.lua в папке moonloader.
+6. НЕ удаляй:
+   moonloader\config\ArizonaPaydayClean.ini
+   moonloader\config\ArizonaPaydayHistory.csv
 7. Запусти игру и проверь /payday.
-8. Проверь новую функцию командой /payscreen, затем отправь /screen Telegram-боту.
+8. До первого Payday текущей сессии /paywatch должен показывать «Жду первый Payday».
+9. После настоящего Payday проверь статистику и, при необходимости, /payscreen и Telegram /screen.
+
+ЕСЛИ ОБНОВЛЯЕШЬСЯ С 2.0.26
+
+- DLL не изменилась: достаточно заменить ArizonaPaydayClean.lua.
+- Конфиг и CSV совместимы и должны остаться на месте.
+- Экспериментального Eco / Sleep режима в 2.0.27 нет.
+
+ЧТО ИСПРАВЛЕНО В 2.0.27
+
+- ложная тревога «Payday не обнаружен» сразу после нового входа;
+- Watchdog начинает отсчёт только после первого Payday текущего запуска;
+- дополнительная защита от странностей при переводе системных часов назад;
+- безопаснее определяется непустой частично повреждённый INI;
+- Telegram send/getUpdates больше не используют один транспорт одновременно;
+- нормализованы окончания строк CSV при поздних обновлениях;
+- введённые данные ранга не влияют на активный расчёт до нажатия «Сохранить».
 
 ВАЖНО
 
@@ -17,11 +37,19 @@ ARIZONA PAYDAY CLEAN v2.0.26
 - Встроенный /payupdate обновляет Lua. DLL нужно установить вручную хотя бы один раз.
 - Не клади вторую копию скрипта под другим именем.
 
+ПРОВЕРКА ФАЙЛОВ
+
+ArizonaPaydayClean.lua
+Size: 203683 bytes
+SHA-256: 20aea201ec10273ae5a8828f0e79e733d47387cfcad1b98be0d3c94e5411ec22
+Encoding: CP1251
+
+ArizonaPaydayScreen.dll
+Size: 10240 bytes
+SHA-256: 5c3186cf2d5fc30c8de6e2ac6eaf6897b5eb7010bb58c603d86f63d6d0af0c87
+
 GITHUB RELEASE
 
-Тег: v2.0.26
-Название: Arizona Payday Clean v2.0.26 — Telegram Screenshot
-Основной asset: ArizonaPaydayClean.lua
-Дополнительный asset: ArizonaPaydayScreen.dll
-Готовый архив: ArizonaPaydayClean-v2.0.26.zip
-Описание: releases/v2.0.26.md
+Тег: v2.0.27
+Название: Arizona Payday Clean v2.0.27 — Stability Audit
+Готовый архив: ArizonaPaydayClean-v2.0.27.zip

@@ -5,7 +5,7 @@
 ### A MoonLoader script for automatic Payday, income, and rank payback tracking on Arizona RP
 
 [![Lua](https://img.shields.io/badge/Lua-MoonLoader-2C2D72?style=for-the-badge&logo=lua&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/version-2.0.26-F59E0B?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/version-2.0.27-F59E0B?style=for-the-badge)](#)
 [![License](https://img.shields.io/badge/license-free-22C55E?style=for-the-badge)](#)
 [![Author](https://img.shields.io/badge/author-Artty-8B5CF6?style=for-the-badge)](#)
 
@@ -37,7 +37,7 @@
 | Parameter | Value |
 |---|---|
 | **Author** | Artty |
-| **Version** | 2.0.26 |
+| **Version** | 2.0.27 |
 | **Platform** | MoonLoader / SA:MP / Arizona RP |
 | **Distribution** | Free |
 | **Main file** | `ArizonaPaydayClean.lua` |
@@ -161,38 +161,53 @@ That is how **Arizona Payday Clean** appeared.
 
 ---
 
-## 🚑 What is new in version 2.0.26
+## 🚑 What is new in version 2.0.27
 
-Version **2.0.26** adds remote GTA screenshots through Telegram without changing the existing Payday accounting flow.
+Version **2.0.27** is a small stability release after an additional code review. It intentionally avoids adding heavy features and focuses on fixing edge cases without changing the normal Payday workflow.
 
-### Added
+### Fixed
 
-- Telegram bot command `/screen` — creates a fresh GTA screenshot and sends it to the saved chat;
-- in-game command `/payscreen` — manually tests the same feature;
-- automatic detection of a new PNG file in standard SA:MP screenshot folders;
-- one screenshot job at a time;
-- clear errors for an unsupported SA:MP build, a missing file, a timeout, or a Telegram failure;
-- `/paytgcommands` now adds `/screen` to the Telegram bot command menu.
+- the missed-Payday monitor no longer treats the saved Payday time from a previous session as a reason to alert immediately after login;
+- `/paywatch` and the Telegram `/watch` command wait for the **first confirmed Payday of the current game session** before monitoring the next one;
+- duplicate protection handles a backwards Windows clock adjustment more safely;
+- INI backup detection no longer stops at the first missing field in a partially damaged configuration;
+- outgoing Telegram requests and `getUpdates` are serialized instead of using the same MoonLoader transport at the same time;
+- CSV rows are normalized before parsing and rewriting so late updates do not accumulate stray `` characters;
+- rank values typed in the payback tab are now a **preview only** and do not affect active calculations until Save is pressed.
 
-### Isolation and stability
+### Preserved
 
-- screenshot creation and photo upload are isolated in `ArizonaPaydayScreen.dll`;
-- photo upload runs separately and does not block the game;
-- existing text delivery, bot polling, and the updater were not rewritten;
-- if the DLL is missing or blocked, only `/screen` is unavailable — Payday tracking, CSV, INI, Telegram reports, rank payback, and UI continue to work;
-- on `/q`, the script requests cancellation and never waits for the network task;
-- `curl.exe`, PowerShell, CMD, BAT files, and `CreateProcessA` are not used;
-- the v2.0.25 financial parser protection against fake player chat messages remains enabled.
+- remote screenshots through `/screen` and `/payscreen`;
+- the same `ArizonaPaydayScreen.dll` used by v2.0.26;
+- protection against fake financial lines posted by players;
+- bank, deposit, salary, AZ Coins, and ticket tracking;
+- CSV history, recovery, and rank payback calculations;
+- safe `/q` shutdown and minimized-game operation.
 
 > [!IMPORTANT]
-> `/screen` requires **both files**: `moonloader/ArizonaPaydayClean.lua` and `moonloader/lib/ArizonaPaydayScreen.dll`. Installing only the Lua file does not break the core script, but screenshot delivery will be unavailable.
+> **No Eco / sleep-mode feature is included in v2.0.27.** Windows Sleep suspends the game and its network connection, so that experimental idea is not part of this release.
 
 > [!NOTE]
-> Some GTA/SA:MP builds cannot create a screenshot while the window is fully minimized or the graphics device is lost. In that case the bot returns an error and statistics remain unchanged.
+> If a complete **v2.0.26** is already installed with `moonloader/lib/ArizonaPaydayScreen.dll`, updating to v2.0.27 only requires replacing `ArizonaPaydayClean.lua`. The DLL did not change.
 
 ---
 
 ## 🕘 Previous version highlights
+
+<details>
+<summary><strong>Version 2.0.26 — GTA screenshot through Telegram</strong></summary>
+
+<br>
+
+- added the Telegram `/screen` command;
+- added the in-game `/payscreen` command;
+- new SA:MP PNG files are detected automatically in the standard screenshot folders;
+- photo upload is isolated in `ArizonaPaydayScreen.dll`;
+- a missing or failed DLL does not stop Payday tracking;
+- photo delivery does not use `curl.exe`, PowerShell, CMD, or BAT files;
+- an active screenshot job is cancelled without waiting for the network during `/q`.
+
+</details>
 
 <details>
 <summary><strong>Version 2.0.25 — stability, /q shutdown, and chat protection</strong></summary>
@@ -277,7 +292,7 @@ A Payday notification may include:
 ### Install or update
 
 1. Fully close GTA.
-2. Open the complete v2.0.26 archive.
+2. Open the complete v2.0.27 archive.
 3. Copy:
 
 ```text
@@ -302,7 +317,7 @@ moonloader/config/ArizonaPaydayHistory.csv
 8. Test the new feature with `/payscreen`, then send `/screen` to the Telegram bot.
 
 > [!IMPORTANT]
-> The built-in `/payupdate` updates the Lua file. Install `ArizonaPaydayScreen.dll` manually at least once from the complete v2.0.26 archive.
+> The built-in `/payupdate` updates the Lua file. Install `ArizonaPaydayScreen.dll` manually at least once from the complete v2.0.27 archive.
 
 > [!CAUTION]
 > Two copies of the script may process the same Payday, duplicate Telegram reports, and increase CPU usage.
@@ -387,16 +402,13 @@ moonloader.log
 
 ```mermaid
 flowchart TD
-    A[Server sends Payday and ticket lines] --> B[Script reads bank, deposit, salary, AZ Coins, and tickets]
-    B --> C[Short collection window for related lines]
+    A[Server sends Payday and ticket lines] --> B[Filter separates system lines from player chat]
+    B --> C[Collect bank, deposit, salary, AZ Coins, and tickets]
     C --> D[Duplicate and late-income checks]
-    D --> E[Update total and session statistics]
-    E --> F[Recalculate rank payback]
-    F --> G[Atomic INI and CSV save]
-    G --> H{Telegram enabled?}
-    H -- No --> I[Wait for the next event]
-    H -- Yes --> J[Asynchronous MoonLoader request]
-    J --> I
+    D --> E[Update statistics, INI, and CSV]
+    E --> F[Telegram report through MoonLoader]
+    S[/screen or /payscreen] --> T[SA:MP creates a new PNG]
+    T --> U[Helper module uploads the photo to Telegram]
 ```
 
 ---
@@ -435,7 +447,7 @@ Values that may exceed a standard 32-bit `InputInt` range are entered as text an
 
 ### Safe shutdown
 
-Version 2.0.26 handles multiple MoonLoader termination events. Once shutdown begins, the script closes the menu, stops new requests, cancels the screenshot job without waiting, unlocks controls, and saves the current state without duplicate writes.
+Version 2.0.27 keeps the unified safe MoonLoader shutdown path. Once shutdown begins, the script closes the menu, stops new requests, cancels the screenshot job without waiting, unlocks controls, and saves the current state without duplicate writes.
 
 ---
 
@@ -483,22 +495,22 @@ The public `ArizonaPaydayClean.lua` contains no bot token or `chat_id`.
 
 ---
 
-## 📦 GitHub Release v2.0.26
+## 📦 GitHub Release v2.0.27
 
 ```text
-Tag: v2.0.26
-Name: Arizona Payday Clean v2.0.26 — Telegram Screenshot
+Tag: v2.0.27
+Name: Arizona Payday Clean v2.0.27 — Stability Audit
 Main file: ArizonaPaydayClean.lua
 Module: lib/ArizonaPaydayScreen.dll
-Ready archive: ArizonaPaydayClean-v2.0.26.zip
+Ready archive: ArizonaPaydayClean-v2.0.27.zip
 ```
 
 File verification:
 
 ```text
 ArizonaPaydayClean.lua
-Size: 201861 bytes
-SHA-256: 95cde9866b0780f65d7e65c3c176ab130bdc9dedeca0485fb2323ab823469184
+Size: 203683 bytes
+SHA-256: 20aea201ec10273ae5a8828f0e79e733d47387cfcad1b98be0d3c94e5411ec22
 Encoding: CP1251
 
 ArizonaPaydayScreen.dll
@@ -506,6 +518,7 @@ Size: 10240 bytes
 SHA-256: 5c3186cf2d5fc30c8de6e2ac6eaf6897b5eb7010bb58c603d86f63d6d0af0c87
 ```
 
+> The DLL is identical to the module shipped with v2.0.26. The v2.0.27 changes are in the Lua file.
 
 ---
 
