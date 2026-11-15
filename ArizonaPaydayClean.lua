@@ -1,4 +1,4 @@
-local SCRIPT_VERSION = '2.0.27'
+local SCRIPT_VERSION = '2.0.28'
 
 -- 2.0.27 RC: watchdog startup fix + conservative stability audit.
 
@@ -3910,6 +3910,58 @@ local function paydayMiniCommand(argument)
     end
 end
 
+-- Тема окна: графитовые поверхности и один янтарный акцент.
+-- Цвет остаётся за деньгами, прогрессом и активной вкладкой.
+local THEME = {
+    accent = imgui.ImVec4(1.00, 0.72, 0.18, 1.00),
+    accentSoft = imgui.ImVec4(1.00, 0.72, 0.18, 0.14),
+    raised = imgui.ImVec4(0.19, 0.18, 0.16, 1.00),
+    raisedHover = imgui.ImVec4(0.23, 0.215, 0.19, 1.00),
+}
+
+imgui.OnInitialize(function()
+    local style = imgui.GetStyle()
+    local c, col, v = style.Colors, imgui.Col, imgui.ImVec4
+
+    style.WindowPadding = imgui.ImVec2(12, 12)
+    style.FramePadding = imgui.ImVec2(10, 7)
+    style.ItemSpacing = imgui.ImVec2(8, 8)
+    style.WindowRounding = 12
+    style.ChildRounding = 10
+    style.FrameRounding = 8
+    style.PopupRounding = 8
+    style.GrabRounding = 8
+    style.ScrollbarRounding = 8
+    style.WindowBorderSize = 1
+    style.ChildBorderSize = 1
+    style.FrameBorderSize = 0
+
+    c[col.Text] = v(0.93, 0.92, 0.90, 1.00)
+    c[col.TextDisabled] = v(0.56, 0.57, 0.60, 1.00)
+    c[col.WindowBg] = v(0.075, 0.080, 0.090, 0.98)
+    c[col.ChildBg] = v(0.105, 0.110, 0.125, 1.00)
+    c[col.PopupBg] = v(0.105, 0.110, 0.125, 1.00)
+    c[col.Border] = v(1.00, 1.00, 1.00, 0.08)
+    c[col.Separator] = v(1.00, 1.00, 1.00, 0.08)
+    c[col.FrameBg] = v(0.150, 0.155, 0.175, 1.00)
+    c[col.FrameBgHovered] = v(0.190, 0.195, 0.220, 1.00)
+    c[col.FrameBgActive] = v(0.220, 0.225, 0.250, 1.00)
+    c[col.Button] = v(0.170, 0.175, 0.200, 1.00)
+    c[col.ButtonHovered] = v(0.220, 0.225, 0.255, 1.00)
+    c[col.ButtonActive] = v(0.260, 0.265, 0.300, 1.00)
+    c[col.Header] = v(0.170, 0.175, 0.200, 1.00)
+    c[col.HeaderHovered] = v(0.220, 0.225, 0.255, 1.00)
+    c[col.HeaderActive] = v(0.260, 0.265, 0.300, 1.00)
+    c[col.CheckMark] = THEME.accent
+    c[col.SliderGrab] = THEME.accent
+    c[col.SliderGrabActive] = THEME.accent
+    c[col.PlotHistogram] = THEME.accent
+    c[col.PlotHistogramHovered] = THEME.accent
+    c[col.TextSelectedBg] = v(1.00, 0.72, 0.18, 0.30)
+    c[col.ScrollbarBg] = v(0.00, 0.00, 0.00, 0.00)
+    c[col.ScrollbarGrab] = v(0.220, 0.225, 0.255, 1.00)
+end)
+
 local function beginPanel(id, x, y, w, h)
     imgui.SetCursorPos(imgui.ImVec2(x, y))
     imgui.BeginChild(id, imgui.ImVec2(w, h), true, UI.panelFlags)
@@ -3938,28 +3990,32 @@ local function tabButton(label, tab, x, y)
     imgui.SetCursorPos(imgui.ImVec2(x, y))
 
     if activeTab == tab then
-        imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.95, 0.50, 0.08, 1.00))
-        imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(1.00, 0.58, 0.12, 1.00))
-        imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(1.00, 0.42, 0.05, 1.00))
+        imgui.PushStyleColor(imgui.Col.Button, THEME.raised)
+        imgui.PushStyleColor(imgui.Col.ButtonHovered, THEME.raisedHover)
+        imgui.PushStyleColor(imgui.Col.ButtonActive, THEME.raisedHover)
+        imgui.PushStyleColor(imgui.Col.Text, THEME.accent)
     else
-        imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.10, 0.115, 0.145, 1.00))
-        imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.18, 0.20, 0.25, 1.00))
-        imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(0.22, 0.24, 0.29, 1.00))
+        imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0, 0, 0, 0))
+        imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(1, 1, 1, 0.05))
+        imgui.PushStyleColor(imgui.Col.ButtonActive, imgui.ImVec4(1, 1, 1, 0.08))
+        imgui.PushStyleColor(imgui.Col.Text, imgui.ImVec4(0.80, 0.80, 0.82, 1.00))
     end
 
     if imgui.Button(u8(label), imgui.ImVec2(180, 38)) then
         activeTab = tab
     end
 
-    imgui.PopStyleColor(3)
+    imgui.PopStyleColor(4)
 end
 
 local function card(id, x, y, w, h, title, value, mode)
     beginPanel(id, x, y, w, h)
     textMuted(title)
     imgui.SetCursorPosX(16)
-    imgui.SetCursorPosY(38)
+    imgui.SetCursorPosY(34)
+    imgui.SetWindowFontScale(1.3)
     textValue(value, mode)
+    imgui.SetWindowFontScale(1.0)
     endPanel()
 end
 
@@ -3985,7 +4041,7 @@ local function drawBankTab()
     card('deposit_total', 620, 252, 340, 78, 'Всего с депозита', money(ini.stats.total_deposit), 1)
 
     beginPanel('stats_panel', 260, 348, 700, 130)
-    textMuted('СТАТИСТИКА')
+    textMuted('Статистика')
     row('Количество PayDay', tostring(ini.stats.paydays), 0, 420)
     row('Общий доход', money((tonumber(ini.stats.total_salary) or 0) + (tonumber(ini.stats.total_deposit) or 0)), 2, 420)
     row('Получено AZ Coins', tostring(ini.stats.total_az) .. ' AZ', 1, 420)
@@ -3993,7 +4049,7 @@ local function drawBankTab()
     endPanel()
 
     beginPanel('forecast_panel', 260, 492, 700, 78)
-    textMuted('ПРОГНОЗ')
+    textMuted('Прогноз')
     imgui.PushItemWidth(80)
     if imgui.InputText('##forecastPaydays', UI.forecastText, ffi.sizeof(UI.forecastText)) then
         forecastPaydays[0] = math.max(1, numberFromBuffer(UI.forecastText))
@@ -4085,7 +4141,7 @@ local function drawRankTab()
     })
 
     beginPanel('rank_now_panel', 260, 330, 700, 122)
-    textMuted('ТЕКУЩИЙ РАСЧЕТ ЗАРПЛАТЫ')
+    textMuted('Текущий расчёт зарплаты')
     row('Обычная зарплата x1', money(st.baseSalary), 0, 430)
     row('Получено за последний PayDay',
         st.salaryReceived and money(st.realSalary) or 'строка не распознана', 1, 430)
@@ -4196,7 +4252,7 @@ local function drawAnalyticsTab()
 
     imgui.SetCursorPos(imgui.ImVec2(260, 100))
     imgui.SetWindowFontScale(1.15)
-    imgui.Text(u8'Аналитика 2.0')
+    imgui.Text(u8'Аналитика')
     imgui.SetWindowFontScale(1.0)
 
     imgui.SetCursorPos(imgui.ImVec2(260, 126))
@@ -4208,7 +4264,7 @@ local function drawAnalyticsTab()
     card('session_az', 785, 154, 175, 72, 'AZ / талоны', tostring(session.az) .. ' / ' .. tostring(session.tickets), 1)
 
     beginPanel('analytics_summary', 260, 240, 700, 108)
-    textMuted('АНАЛИТИКА')
+    textMuted('Аналитика')
     row('Средний доход в сессии', money(sessionAverage), 2, 455)
     row('Средний доход по истории', money(historyAverageIncome()), 1, 455)
     row('Записей в истории', tostring(#historyCache), 0, 455)
@@ -4216,7 +4272,7 @@ local function drawAnalyticsTab()
     endPanel()
 
     beginPanel('history_panel', 260, 362, 700, 178)
-    textMuted('ПОСЛЕДНИЕ PAYDAY')
+    textMuted('Последние Payday')
 
     if #historyCache == 0 then
         imgui.SetCursorPos(imgui.ImVec2(16, 42))
@@ -4237,7 +4293,7 @@ local function drawAnalyticsTab()
     endPanel()
 
     beginPanel('analytics_settings', 260, 554, 700, 82)
-    textMuted('КОНТРОЛЬ И ДИАГНОСТИКА')
+    textMuted('Контроль и диагностика')
 
     imgui.SetCursorPos(imgui.ImVec2(16, 42))
     if imgui.Checkbox(u8'Контроль Payday', afkEnabled) then
@@ -4801,13 +4857,13 @@ local updater = (function()
         card('update_pending',724,160,236,78,'Готова к установке',pending~='' and pending or 'нет',pending~='' and 2 or 0)
 
         beginPanel('update_status',260,254,700,124)
-        textMuted('СТАТУС')
+        textMuted('Статус')
         imgui.SetCursorPos(imgui.ImVec2(16,42)); imgui.PushTextWrapPos(665); textValue(statusText,busy and 1 or 0); imgui.PopTextWrapPos()
         imgui.SetCursorPos(imgui.ImVec2(16,90)); textMuted('Последняя проверка: '..lastCheckText)
         endPanel()
 
         beginPanel('update_simple',260,394,700,112)
-        textMuted('РЕЖИМ')
+        textMuted('Режим')
         imgui.SetCursorPos(imgui.ImVec2(16,42))
         if imgui.Checkbox(u8'Автообновление',autoUpdate) then
             ini.update.auto_check=autoUpdate[0]
@@ -4821,7 +4877,7 @@ local updater = (function()
         endPanel()
 
         beginPanel('update_actions',260,522,700,114)
-        textMuted('ДЕЙСТВИЯ')
+        textMuted('Действия')
         imgui.SetCursorPos(imgui.ImVec2(16,42))
         if imgui.Button(u8'Проверить и обновить',imgui.ImVec2(300,40)) then smartUpdate(true) end
         imgui.SameLine()
@@ -4874,7 +4930,7 @@ end, function()
     imgui.Begin('##PaydayMiniWindow', nil, MINI.flags)
 
     imgui.SetCursorPos(imgui.ImVec2(14, 10))
-    textValue('PAYDAY RANK', 1)
+    textValue('Окупаемость ранга', 1)
     imgui.SetCursorPos(imgui.ImVec2(246, 10))
     textValue(multiplierText(st.multiplier), 2)
 
@@ -4904,9 +4960,11 @@ local mainFrame = imgui.OnFrame(function() return window[0] and not UI.shuttingD
 
     beginPanel('topbar', 12, 10, 976, 62)
     imgui.SetWindowFontScale(1.22)
-    imgui.Text(u8('PAYDAY CENTER ' .. SCRIPT_VERSION))
+    imgui.Text(u8'Arizona Payday Clean')
     imgui.SetWindowFontScale(1.0)
-    textMuted('Arizona RP - экономика, история, контроль Payday и Telegram')
+    imgui.SameLine()
+    textMuted('v' .. SCRIPT_VERSION)
+    textMuted('Доход, окупаемость ранга, история и Telegram')
     imgui.SetCursorPos(imgui.ImVec2(926, 10))
     if imgui.Button('X##close_main', imgui.ImVec2(34, 32)) then
         setMenuState(false)
@@ -4914,7 +4972,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] and not UI.shuttingD
     endPanel()
 
     beginPanel('sidebar', 20, 92, 210, 548)
-    textMuted('МЕНЮ')
+    textMuted('Разделы')
     tabButton('Банковский чек', 1, 16, 42)
     tabButton('Окупаемость', 2, 16, 90)
     tabButton('Telegram', 3, 16, 138)
@@ -4924,7 +4982,7 @@ local mainFrame = imgui.OnFrame(function() return window[0] and not UI.shuttingD
     imgui.SetCursorPos(imgui.ImVec2(16, 278))
     imgui.Separator()
     imgui.SetCursorPos(imgui.ImVec2(16, 296))
-    textMuted('СТАТУС')
+    textMuted('Статус')
     imgui.SetCursorPos(imgui.ImVec2(16, 320))
     imgui.PushTextWrapPos(190)
     textValue(statusText, 1)
