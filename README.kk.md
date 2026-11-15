@@ -115,7 +115,7 @@ flowchart TD
     C --> D[Қайталану мен кеш төлемдерді тексеру]
     D --> E[Статистика, INI және CSV]
     E --> F[Telegram есебі]
-    S[/screen немесе /payscreen] --> T[SA:MP PNG сақтайды]
+    S["/screen немесе /payscreen"] --> T[SA:MP PNG сақтайды]
     T --> U[Модуль фотоны жібереді]
 ```
 

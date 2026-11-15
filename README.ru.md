@@ -115,7 +115,7 @@ flowchart TD
     C --> D[Проверка дублей и поздних начислений]
     D --> E[Статистика, INI и CSV]
     E --> F[Отчёт в Telegram]
-    S[/screen или /payscreen] --> T[SA:MP сохраняет PNG]
+    S["/screen или /payscreen"] --> T[SA:MP сохраняет PNG]
     T --> U[Модуль отправляет фото]
 ```
 

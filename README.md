@@ -115,7 +115,7 @@ flowchart TD
     C --> D[Duplicate and late-credit check]
     D --> E[Stats, INI and CSV]
     E --> F[Telegram report]
-    S[/screen or /payscreen] --> T[SA:MP saves a PNG]
+    S["/screen or /payscreen"] --> T[SA:MP saves a PNG]
     T --> U[Module sends the photo]
 ```
 
